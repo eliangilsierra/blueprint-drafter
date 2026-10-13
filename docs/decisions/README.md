@@ -8,11 +8,11 @@ is shaped the way it is. The architecture that applies them is in [docs/architec
 
 | ADR | Title | Status | Date |
 | --- | --- | --- | --- |
-| [ADR-0001](ADR-0001-local-first-typescript-core-with-thin-adapters.md) | Build a local-first, deterministic TypeScript core library with thin adapters | Proposed | 2026-10-13 |
-| [ADR-0002](ADR-0002-reuse-elk-layered-and-a-sequence-engine.md) | Reuse ELK Layered (elkjs) for graph layout and a dedicated sequence engine | Proposed | 2026-10-13 |
-| [ADR-0003](ADR-0003-one-canonical-line-format-as-operation-language.md) | Use one line-based canonical text format that is also the operation language | Proposed | 2026-10-13 |
-| [ADR-0004](ADR-0004-cli-first-then-mcp-skill-and-ci.md) | Expose the core through a CLI first, then a thin MCP server, an Agent Skill and a CI check | Proposed | 2026-10-13 |
-| [ADR-0005](ADR-0005-apache-2-0-and-dependency-licence-policy.md) | License the project under Apache-2.0 and admit runtime dependencies by licence policy | Proposed | 2026-10-13 |
+| [ADR-0001](ADR-0001-local-first-typescript-core-with-thin-adapters.md) | Build a local-first, deterministic TypeScript core library with thin adapters | Accepted | 2026-10-13 |
+| [ADR-0002](ADR-0002-reuse-elk-layered-and-a-sequence-engine.md) | Reuse ELK Layered (elkjs) for graph layout and a dedicated sequence engine | Accepted | 2026-10-13 |
+| [ADR-0003](ADR-0003-one-canonical-line-format-as-operation-language.md) | Use one line-based canonical text format that is also the operation language | Accepted | 2026-10-13 |
+| [ADR-0004](ADR-0004-cli-first-then-mcp-skill-and-ci.md) | Expose the core through a CLI first, then a thin MCP server, an Agent Skill and a CI check | Accepted | 2026-10-13 |
+| [ADR-0005](ADR-0005-apache-2-0-and-dependency-licence-policy.md) | License the project under Apache-2.0 and admit runtime dependencies by licence policy | Accepted | 2026-10-13 |
 | [ADR-0006](ADR-0006-name-binary-extension-and-header.md) | Name the CLI binary, the diagram file extension and the format header keyword | Proposed | 2026-10-13 |
 | [ADR-0007](ADR-0007-one-npm-package-compiled-esm-node-22.md) | Distribute one npm package with one binary, compiled to ESM for Node.js 22 or later | Proposed | 2026-10-13 |
 

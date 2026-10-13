@@ -2,13 +2,16 @@
 
 ## Status
 
-Proposed
+Accepted
+
+Accepted by the repository owner (@eliangilsierra) in the "Human decisions" comment on Issue #1:
+<https://github.com/eliangilsierra/blueprint-drafter/issues/1#issuecomment-6153734681>.
 
 | Field | Value |
 | --- | --- |
 | Date proposed | 2026-10-13 |
-| Date decided | — |
-| Decided by | — |
+| Date decided | 2026-10-13 |
+| Decided by | @eliangilsierra (repository owner) |
 | Related Issue | #3 (architecture), #1 (requirements) |
 | Supersedes | None |
 | Related ADRs | ADR-0002, ADR-0003, ADR-0004, ADR-0005, ADR-0007 |

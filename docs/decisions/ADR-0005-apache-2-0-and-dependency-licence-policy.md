@@ -2,13 +2,19 @@
 
 ## Status
 
-Proposed
+Accepted
+
+Accepted by the repository owner (@eliangilsierra) in the "Human decisions" comment on Issue #1:
+<https://github.com/eliangilsierra/blueprint-drafter/issues/1#issuecomment-6153734681>.
+That comment accepts the Apache-2.0 licence; the dependency constraint (elkjs EPL-2.0, resvg-js
+MPL-2.0, IBM Plex Sans OFL-1.1) is the owner's own constraint in the original request quoted in
+Issue #1 and listed in Issue #3.
 
 | Field | Value |
 | --- | --- |
 | Date proposed | 2026-10-13 |
-| Date decided | — |
-| Decided by | — |
+| Date decided | 2026-10-13 |
+| Decided by | @eliangilsierra (repository owner) |
 | Related Issue | #3 (architecture), #1 (requirements) |
 | Supersedes | None |
 | Related ADRs | ADR-0001, ADR-0002 |
