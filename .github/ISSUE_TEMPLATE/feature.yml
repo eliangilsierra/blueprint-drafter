@@ -1,0 +1,95 @@
+name: Feature request
+description: Propose a new capability. The Product Manager agent turns it into testable requirements.
+title: "[Feature]: "
+labels: ["agent:product"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the **problem**, not only a solution. The Product Manager agent will rewrite this
+        Issue into the requirements template (`templates/requirements.md`) and quote your original
+        text at the bottom. Do not include secrets, credentials or personal data.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Who has the problem, in which situation, what happens today, and why it matters.
+      placeholder: |
+        Support agents cannot see a customer's last order from the ticket view. They switch to the
+        admin panel and search manually, which takes about 2 minutes per ticket.
+    validations:
+      required: true
+
+  - type: textarea
+    id: users
+    attributes:
+      label: Users and stakeholders
+      description: Which existing user roles are affected and how.
+      placeholder: "Support agents (daily use), support lead (reporting)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: goals
+    attributes:
+      label: Goals and success signal
+      description: The outcome you want. Include a measurable signal if you know one.
+      placeholder: "Agents find the last order in under 10 seconds without leaving the ticket."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: Proposed solution (optional)
+      description: If you have a solution in mind, describe it. It will be treated as one option, not as a requirement.
+    validations:
+      required: false
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: In scope / out of scope
+      description: What must be included, and what is explicitly not part of this request.
+      placeholder: |
+        In scope: show last order number, date and status in the ticket sidebar.
+        Out of scope: editing orders from the ticket view.
+    validations:
+      required: false
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: How will we know it works?
+      description: Observable outcomes you expect. The Product Manager converts them into Given/When/Then acceptance criteria.
+    validations:
+      required: false
+
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints
+      description: Deadlines, compliance, compatibility, budget or technical constraints, with their source.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - Low
+        - Medium
+        - High
+        - Urgent
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Links to related Issues, documents, screenshots.
+    validations:
+      required: false

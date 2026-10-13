@@ -1,0 +1,37 @@
+# Secrets and credentials - never commit them (rotate any credential that was committed)
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+id_rsa*
+id_ed25519*
+credentials.json
+.credentials.json
+secrets/
+
+# Agent team runtime state (kept out of git by the hooks too)
+.agent-state/
+.claude/
+.openhands/
+
+# Dependencies and build output
+node_modules/
+dist/
+dist-test/
+coverage/
+*.tsbuildinfo
+*.tgz
+
+# Editors and operating systems
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db

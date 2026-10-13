@@ -1,0 +1,103 @@
+name: Engineering task
+description: One implementable unit of work, normally created by the Planner agent. Becomes ai-ready after the readiness checklist.
+title: "[Task]: "
+labels: ["agent:planner"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A task must be **small, testable, independently understandable, implementable and traceable**
+        (see `skills/planning/SKILL.md`). Only the Planner or a human adds the `ai-ready` label.
+        The `ai-workflow` check verifies that every section below is present before a task is accepted as ready.
+
+  - type: input
+    id: parent
+    attributes:
+      label: Parent issue
+      description: The feature or bug Issue this task belongs to.
+      placeholder: "#120"
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: The minimum background a Developer needs. Link requirements, architecture sections and ADRs instead of quoting them.
+      placeholder: "Part of #120 (login throttling). ADR-0007 stores throttling state in the users table."
+    validations:
+      required: true
+
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objective
+      description: The single outcome of this task.
+      placeholder: "Reject login for an account after 5 consecutive failed attempts within 15 minutes."
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: What this task changes.
+    validations:
+      required: true
+
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: Out of scope
+      description: What this task explicitly does not change, with links to the tasks that do.
+    validations:
+      required: true
+
+  - type: textarea
+    id: approach
+    attributes:
+      label: Technical approach
+      description: Components, interfaces and patterns to use, and decisions already made (cite architecture sections and ADRs, do not copy them). Not line-by-line code.
+    validations:
+      required: true
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies
+      description: Blocking Issues ("Depends on #n") or "None".
+      value: "None"
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Testable criteria (Given/When/Then), copied or derived from the parent's AC IDs.
+      placeholder: |
+        - AC-1 (FR-1): Given an account with 4 failed attempts in the last 15 minutes, when a 5th attempt fails, then the 6th attempt with the correct password is rejected with HTTP 429.
+    validations:
+      required: true
+
+  - type: textarea
+    id: testing
+    attributes:
+      label: Testing requirements
+      description: Test levels and specific cases required.
+      placeholder: |
+        - Unit: threshold reached at 5th failure; counter reset on success; failures older than 15 min ignored
+        - Integration: POST /login returns 429 on the 6th attempt
+    validations:
+      required: true
+
+  - type: textarea
+    id: dod
+    attributes:
+      label: Definition of Done
+      description: The global Definition of Done (AGENTS.md section 12) always applies; list only task-specific items.
+      value: |
+        AGENTS.md §12, plus:
+        - [ ] <task-specific item, or remove this line>
+    validations:
+      required: true
