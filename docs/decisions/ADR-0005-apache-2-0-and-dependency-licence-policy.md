@@ -72,7 +72,11 @@ in a third-party notices file that a test compares with the package's dependency
 
 **Follow-up actions**
 
-- Create `NOTICE` and the third-party notices file with the first runtime dependency.
+- Create `NOTICE` and the third-party notices file with the first runtime dependency; the notices
+  cover the whole production tree, including optional platform packages, and record the licence
+  elected for elkjs (EPL-2.0).
+- Vendor the unmodified IBM Plex Sans files with the OFL text instead of depending on the npm package
+  `@ibm/plex-sans`, whose `postinstall` runs a telemetry tool (architecture sections 6.1 and 9).
 
 ## Security considerations
 

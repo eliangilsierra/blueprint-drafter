@@ -73,8 +73,13 @@ with type declarations by `tsc`, for **Node.js 22 or later** (CI covers the supp
 
 ## Security considerations
 
-Fewer packages means fewer publish credentials and a smaller supply chain. Releases use npm provenance
-and attach an SBOM (ADR-0005). The package has no install scripts of its own.
+One package means one set of publish credentials. It does not mean a small supply chain: the five
+direct runtime dependencies pull a production tree of about 120 packages (prototype measurement), most
+of it from the MCP SDK, and every library user installs it. The controls are in architecture section 9
+(B5): exact pins, a published `npm-shrinkwrap.json` so that `npx` consumers get the reviewed tree,
+an install-script allow-list, `npm audit` and signature checks, provenance and an SBOM. The package
+has no install scripts of its own. MCP configuration examples pin an exact version
+(`npx -y blueprint-drafter@<x.y.z> mcp`).
 
 ## Operational considerations
 

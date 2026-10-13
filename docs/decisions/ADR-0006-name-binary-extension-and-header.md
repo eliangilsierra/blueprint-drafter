@@ -77,15 +77,20 @@ header keyword: `diagram` (chosen; brand-neutral and self-explanatory to models)
 **Negative**
 
 - Option A is long; a short alias can be added later without breaking anything (additive).
+- Whether `.bpd` is used by unrelated tools was not verified; the risk (file-association confusion only) is accepted.
 
 **Follow-up actions**
 
 - The first implementation task (scaffold) uses these names.
+- Registry check recorded after acceptance (security review of PR #4, 2026-10-13): `npm view` returned E404 for `blueprint-drafter`, `blueprintdrafter` and `blueprint-draft` (unclaimed), while `drafter` and `bpd` belong to unrelated maintainers. The owner claims `blueprint-drafter` before any document, Skill or MCP example that names it is published (architecture section 20).
 
 ## Security considerations
 
 Documentation and the Skill must always invoke the CLI through the package name with `npx`, never
-through a short alias, to avoid running an unrelated npm package.
+through a short alias, to avoid running an unrelated npm package. Every `npx` example names an exact
+version (`npx --yes blueprint-drafter@<x.y.z> ...`), and the package name must be claimed on npm
+before those examples are published; otherwise a third party could register it and run code wherever
+the documentation is followed (name squatting).
 
 ## Operational considerations
 
