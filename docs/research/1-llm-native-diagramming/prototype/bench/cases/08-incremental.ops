@@ -1,0 +1,7 @@
+# Caso 8 (sobre 04-distributed): añadir un servicio, cambiar varias relaciones y eliminar un componente
++node fraud service "Fraud Detection" in=core tech=Python
++edge trips>fraud "score trip"
++edge fraud>events "fraud alerts" style=async
+~edge events>pay "trip settled"
+~edge pricing>maps to=geo label="cached ETA"
+-node notify

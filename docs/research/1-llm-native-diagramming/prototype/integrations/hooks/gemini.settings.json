@@ -1,0 +1,11 @@
+{
+  "//": "Ejemplo para Gemini CLI (geminicli.com/docs/hooks, consulta 2026-10-13). Exit 2 bloquea y devuelve stderr como motivo.",
+  "hooks": {
+    "AfterTool": [
+      {
+        "matcher": "write_file|replace|plano_apply",
+        "hooks": [{ "type": "command", "command": "node integrations/hooks/plano-check-hook.mjs" }]
+      }
+    ]
+  }
+}

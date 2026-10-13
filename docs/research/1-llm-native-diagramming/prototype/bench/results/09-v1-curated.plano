@@ -1,0 +1,19 @@
+plano 1 type=component dir=LR title="Order API — module dependencies (from code)"
+group app boundary "order-api" tags=code
+node api module "api" in=app tags=code
+node auth module "auth" in=app tags=code
+node db module "db" in=app tags=code
+node events module "events" in=app tags=code
+node legacy module "legacy" in=app tags=code
+node orders module "Order Management" in=app desc="Owns the order lifecycle" tags=code
+node postgres db "PostgreSQL" tags=code
+node kafka topic "Kafka" tags=code
+node client person "API Client"
+edge api>auth "uses" src=code
+edge api>orders "uses" src=code
+edge db>postgres "via pg" src=code
+edge events>kafka "via kafkajs" src=code
+edge orders>db "uses" src=code
+edge orders>events "uses" src=code
+edge orders>legacy "uses" src=code
+edge client>api "Calls" tech=HTTPS

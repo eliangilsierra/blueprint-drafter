@@ -1,0 +1,36 @@
+plano 1 type=architecture dir=LR title="Ride-hailing platform — runtime view"
+group edge zone "Edge"
+group core boundary "Core services"
+group data zone "Data"
+node rider mobile "Rider App" tech=iOS/Android
+node driver mobile "Driver App" tech=iOS/Android
+node gw gateway "API Gateway" in=edge tech=Envoy
+node auth service "Auth Service" in=core tech=Go
+node trips service "Trip Service" in=core tech=Kotlin
+node match service "Matching Service" in=core tech=Go
+node pricing service "Pricing Service" in=core tech=Python
+node pay service "Payment Service" in=core tech=Java
+node notify service "Notification Service" in=core tech=Node.js
+node tripsdb db "Trips DB" in=data tech=PostgreSQL
+node geo cache "Geo Index" in=data tech=Redis
+node events topic "Trip Events" in=core tech=Kafka
+node ledger db "Payments Ledger" in=data tech=PostgreSQL
+node psp external "Payment Provider" desc="Card processing"
+node maps external "Maps Provider" desc="Routing and ETA"
+node push external "Push Gateway" desc="APNs / FCM"
+edge rider>gw "requests ride" tech=HTTPS
+edge driver>gw "streams location" tech=gRPC
+edge gw>auth "validates token"
+edge gw>trips "routes"
+edge gw>match "location updates"
+edge trips>match "find driver"
+edge match>geo "nearest drivers"
+edge trips>pricing "quote"
+edge pricing>maps "ETA" tech=HTTPS
+edge trips>tripsdb "persists"
+edge trips>events "publishes" style=async
+edge events>pay "trip completed" style=async
+edge events>notify "trip updates" style=async
+edge pay>ledger "records"
+edge pay>psp "charges" tech=HTTPS
+edge notify>push "sends" tech=HTTPS

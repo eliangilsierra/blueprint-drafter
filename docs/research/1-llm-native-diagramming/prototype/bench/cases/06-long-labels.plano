@@ -1,0 +1,13 @@
+plano 1 type=architecture dir=LR title="Long names, descriptions and connector labels"
+node portal webapp "Customer Self-Service Portal and Account Management Console" tech="Next.js 15, React Server Components" desc="Lets customers manage subscriptions, invoices, payment methods and notification preferences from any device"
+node bff service "Backend-for-Frontend Aggregation Layer" tech="GraphQL Federation Gateway" desc="Aggregates and reshapes data from downstream domain services for the portal"
+node subs service "Subscription Lifecycle Management Service" tech="Java 21, Spring Boot" desc="Owns plans, trials, upgrades, downgrades, renewals and cancellations"
+node invoicing service "Invoicing and Revenue Recognition Service" tech=Kotlin desc="Generates invoices and recognises revenue according to IFRS 15"
+node warehouse db "Analytical Data Warehouse" tech=Snowflake desc="Historical subscription and revenue facts for reporting"
+node crm external "Third-Party Customer Relationship Management Platform" desc="Salesforce Sales Cloud"
+edge portal>bff "Queries account overview, subscriptions and invoices" tech="GraphQL over HTTPS"
+edge bff>subs "Fetches active subscriptions and pending plan changes" tech=gRPC
+edge bff>invoicing "Fetches invoice history with pagination" tech=gRPC
+edge subs>invoicing "Emits billing events when a subscription changes" tech=Kafka style=async
+edge invoicing>warehouse "Exports nightly revenue snapshots" tech="Batch ETL" style=async
+edge subs>crm "Synchronises account status and plan for sales follow-up" tech="REST, OAuth 2.0"

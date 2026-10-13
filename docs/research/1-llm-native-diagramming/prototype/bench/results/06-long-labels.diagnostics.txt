@@ -1,0 +1,2 @@
+W W_ILLEGIBLE_AT_FIT — smallest text renders at 7.4px when fitted to 1600x1000 | fix: split into views (e.g. one per boundary) or switch dir
+I I_ASPECT — aspect ratio 6.0:1 | fix: try dir=TB

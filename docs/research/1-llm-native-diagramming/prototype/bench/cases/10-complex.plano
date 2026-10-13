@@ -1,0 +1,91 @@
+plano 1 type=architecture dir=LR title="E-commerce platform — full container landscape (stress test)"
+group channels zone "Channels"
+group edgez zone "Edge"
+group commerce boundary "Commerce domain"
+group fulfil boundary "Fulfilment domain"
+group customer boundary "Customer domain"
+group platform zone "Platform"
+node web webapp "Storefront Web" in=channels tech=Next.js
+node ios mobile "iOS App" in=channels tech=Swift
+node android mobile "Android App" in=channels tech=Kotlin
+node pos webapp "Point of Sale" in=channels tech=React
+node partner external "Marketplace Partners"
+node cdn gateway "CDN" in=edgez tech=Fastly
+node gw gateway "API Gateway" in=edgez tech=Kong
+node bff service "Storefront BFF" in=edgez tech=GraphQL
+node catalog service "Catalog" in=commerce tech=Go
+node search service "Search" in=commerce tech=Java
+node pricing service "Pricing" in=commerce tech=Go
+node promo service "Promotions" in=commerce tech=Kotlin
+node cart service "Cart" in=commerce tech=Node.js
+node checkout service "Checkout" in=commerce tech=Java
+node orders service "Orders" in=commerce tech=Java
+node payments service "Payments" in=commerce tech=Java
+node inventory service "Inventory" in=fulfil tech=Go
+node warehouse service "Warehouse Mgmt" in=fulfil tech=Java
+node shipping service "Shipping" in=fulfil tech=Kotlin
+node returns service "Returns" in=fulfil tech=Kotlin
+node accounts service "Accounts" in=customer tech=Go
+node profile service "Profiles" in=customer tech=Go
+node loyalty service "Loyalty" in=customer tech=Python
+node reviews service "Reviews" in=customer tech=Python
+node notif service "Notifications" in=platform tech=Node.js
+node analytics service "Analytics Pipeline" in=platform tech=Flink
+node bus topic "Event Bus" in=platform tech=Kafka
+node catalogdb db "Catalog DB" in=commerce tech=MongoDB
+node searchidx db "Search Index" in=commerce tech=OpenSearch
+node cartcache cache "Cart Cache" in=commerce tech=Redis
+node orderdb db "Orders DB" in=commerce tech=PostgreSQL
+node paydb db "Payments DB" in=commerce tech=PostgreSQL
+node invdb db "Inventory DB" in=fulfil tech=PostgreSQL
+node accdb db "Accounts DB" in=customer tech=PostgreSQL
+node lake storage "Data Lake" in=platform tech=S3
+node idp external "Identity Provider" tech=OIDC
+node psp external "Payment Processor"
+node carrier external "Carriers API"
+node email external "E-mail Provider"
+node erp external "ERP"
+edge web>cdn "loads"
+edge ios>gw "API calls"
+edge android>gw "API calls"
+edge pos>gw "API calls"
+edge partner>gw "orders feed"
+edge cdn>bff "queries"
+edge gw>bff "routes"
+edge gw>accounts "auth"
+edge accounts>idp "federates"
+edge accounts>accdb "stores"
+edge bff>catalog "products"
+edge bff>search "search"
+edge bff>cart "cart ops"
+edge bff>profile "profile"
+edge bff>reviews "reviews"
+edge catalog>catalogdb "reads"
+edge search>searchidx "queries"
+edge catalog>bus "product events" style=async
+edge bus>search "reindex" style=async
+edge cart>cartcache "stores"
+edge cart>pricing "prices"
+edge pricing>promo "applies"
+edge cart>checkout "starts"
+edge checkout>payments "pays"
+edge checkout>orders "creates"
+edge checkout>inventory "reserves"
+edge payments>psp "charges"
+edge payments>paydb "records"
+edge orders>orderdb "persists"
+edge orders>bus "order events" style=async
+edge bus>shipping "ship order" style=async
+edge bus>notif "notify" style=async
+edge bus>loyalty "accrue points" style=async
+edge bus>analytics "stream" style=async
+edge inventory>invdb "persists"
+edge warehouse>inventory "stock levels"
+edge shipping>warehouse "pick list"
+edge shipping>carrier "labels"
+edge returns>orders "refund"
+edge returns>payments "refund"
+edge notif>email "sends"
+edge analytics>lake "writes"
+edge orders>erp "invoices" style=async
+edge profile>accdb "reads"

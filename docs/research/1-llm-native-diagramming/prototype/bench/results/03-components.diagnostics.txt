@@ -1,0 +1,2 @@
+I I_CROSSINGS — 1 edge crossings (0.08 per edge)
+I I_ASPECT — aspect ratio 3.0:1 | fix: try dir=TB

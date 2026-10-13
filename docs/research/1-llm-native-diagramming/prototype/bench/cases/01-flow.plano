@@ -1,0 +1,35 @@
+plano 1 type=flow dir=TB title="Order fulfilment"
+node start start "Order received"
+node validate process "Validate order"
+node valid decision "Order valid?"
+node reject process "Notify customer of rejection"
+node stock decision "Items in stock?"
+node backorder process "Create backorder"
+node wait process "Wait for restock"
+node reserve process "Reserve inventory"
+node pay process "Charge payment"
+node paid decision "Payment approved?"
+node retry decision "Retries left?"
+node cancel process "Cancel and release stock"
+node ship process "Pick, pack and ship"
+node notify process "Send tracking e-mail"
+node done end "Order complete"
+node failed end "Order closed"
+edge start>validate
+edge validate>valid
+edge valid>stock "yes"
+edge valid>reject "no"
+edge reject>failed
+edge stock>reserve "yes"
+edge stock>backorder "no"
+edge backorder>wait
+edge wait>stock "restocked"
+edge reserve>pay
+edge pay>paid
+edge paid>ship "yes"
+edge paid>retry "no"
+edge retry>pay "yes"
+edge retry>cancel "no"
+edge cancel>failed
+edge ship>notify
+edge notify>done

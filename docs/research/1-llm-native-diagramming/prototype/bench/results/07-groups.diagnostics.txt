@@ -1,0 +1,4 @@
+W W_EDGE_DETOUR usapi>eudb — edge 'usapi>eudb' takes a 1978px detour (direct ≈ 451px) | fix: grouping forces this; consider ~node eudb in= (leave 'eu') or dir change
+W W_ILLEGIBLE_AT_FIT — smallest text renders at 7.5px when fitted to 1600x1000 | fix: split into views (e.g. one per boundary) or switch dir
+I I_CROSSINGS — 5 edge crossings (0.38 per edge)
+I I_ASPECT — aspect ratio 3.3:1 | fix: try dir=TB

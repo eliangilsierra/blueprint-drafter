@@ -1,0 +1,30 @@
+{
+  "name": "plano-prototype",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "bench": "node bench/run.ts",
+    "test": "node --test test/",
+    "mcp": "node src/mcp.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "Apache-2.0",
+  "description": "Prototipo: motor de diagramas semántico nativo para LLMs",
+  "dependencies": {
+    "@anthropic-ai/tokenizer": "^0.0.4",
+    "@dagrejs/dagre": "^3.1.1",
+    "@ibm/plex-sans": "^1.1.0",
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "@resvg/resvg-js": "^2.6.2",
+    "elkjs": "^0.12.0",
+    "fontkit": "^2.0.4",
+    "js-tiktoken": "^1.0.21",
+    "zod": "^4.6.7"
+  },
+  "type": "module",
+  "private": true,
+  "bin": {
+    "plano": "src/cli.ts"
+  }
+}

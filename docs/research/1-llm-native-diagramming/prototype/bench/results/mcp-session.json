@@ -1,0 +1,59 @@
+{
+ "toolCount": 6,
+ "toolDefTokens": 587,
+ "instructionsTokens": 133,
+ "steps": [
+  {
+   "step": "crear",
+   "in": 30,
+   "out": 4
+  },
+  {
+   "step": "poblar (una sola llamada)",
+   "in": 364,
+   "out": 31
+  },
+  {
+   "step": "validar",
+   "in": 15,
+   "out": 12
+  },
+  {
+   "step": "consulta selectiva",
+   "in": 23,
+   "out": 235
+  },
+  {
+   "step": "edición incremental",
+   "in": 59,
+   "out": 60
+  },
+  {
+   "step": "operación inválida",
+   "in": 23,
+   "out": 26
+  },
+  {
+   "step": "render",
+   "in": 19,
+   "out": 10
+  },
+  {
+   "step": "export draw.io",
+   "in": 20,
+   "out": 11
+  },
+  {
+   "step": "fuera del workspace",
+   "in": 16,
+   "out": 9
+  }
+ ],
+ "total": 967,
+ "samples": {
+  "r1": "ok\n+group x1, +node x8, +edge x10 (19 changes; use show to read state)\n0E 0W",
+  "r2": "ok\n+node cache cache \"Session Cache\" in=c1 tech=Redis\n+edge api>cache \"Caches sessions in\"\n~edge api>db \"Reads from and writes to\" tech=\"sync, JDBC\" style=async\n-edge customer>webApp\n0E 0W",
+  "r3": "REJECTED E_UNKNOWN_ID op#1: no element 'mainfram' | fix: did you mean 'mainframe'?",
+  "r4": "E_OUTSIDE_WORKSPACE ../../secret.plano"
+ }
+}

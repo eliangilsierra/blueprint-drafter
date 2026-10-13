@@ -1,0 +1,1 @@
+I I_SELF_LOOP orders>orders — self-loop on 'orders'

@@ -1,0 +1,1 @@
+W W_ILLEGIBLE_AT_FIT — smallest text renders at 7.9px when fitted to 1600x1000 | fix: split into views (e.g. one per boundary) or switch dir

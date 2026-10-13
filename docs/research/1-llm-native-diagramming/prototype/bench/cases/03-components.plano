@@ -1,0 +1,27 @@
+plano 1 type=component dir=LR title="Billing service — component dependencies"
+group billing boundary "billing-service"
+node http component "HTTP Controllers" in=billing tech=Express
+node auth component "Auth Middleware" in=billing tech=JWT
+node invoices component "Invoice Module" in=billing
+node pricing component "Pricing Engine" in=billing
+node tax component "Tax Calculator" in=billing
+node payments component "Payments Module" in=billing
+node ledger component "Ledger Repository" in=billing tech=Prisma
+node events component "Event Publisher" in=billing
+node pdf component "PDF Renderer" in=billing
+node pg db "PostgreSQL" tech=v16
+node bus queue "Event Bus" tech=Kafka
+node stripe external "Stripe API"
+edge http>auth "authenticates via"
+edge http>invoices "delegates to"
+edge http>payments "delegates to"
+edge invoices>pricing "prices lines with"
+edge pricing>tax "computes tax with"
+edge invoices>ledger "persists via"
+edge payments>ledger "records in"
+edge payments>stripe "charges via" tech=HTTPS
+edge invoices>pdf "renders with"
+edge invoices>events "publishes"
+edge payments>events "publishes"
+edge ledger>pg "SQL"
+edge events>bus "produces"
