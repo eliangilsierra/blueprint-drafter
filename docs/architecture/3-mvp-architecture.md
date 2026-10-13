@@ -5,14 +5,14 @@
 | Issue | #3 |
 | Requirements | #1 (FR-1 to FR-30, NFR-1 to NFR-13, AC-1 to AC-48) |
 | Research | #1, [research report](../research/1-llm-native-diagramming.md) and its [annex](../research/1-llm-native-diagramming/README.md) |
-| ADRs | [ADR-0001](../decisions/ADR-0001-local-first-typescript-core-with-thin-adapters.md) to [ADR-0005](../decisions/ADR-0005-apache-2-0-and-dependency-licence-policy.md) (Accepted); [ADR-0006](../decisions/ADR-0006-name-binary-extension-and-header.md), [ADR-0007](../decisions/ADR-0007-one-npm-package-compiled-esm-node-22.md) (Proposed) |
+| ADRs | [ADR-0001](../decisions/ADR-0001-local-first-typescript-core-with-thin-adapters.md) to [ADR-0005](../decisions/ADR-0005-apache-2-0-and-dependency-licence-policy.md) and [ADR-0006](../decisions/ADR-0006-name-binary-extension-and-header.md), [ADR-0007](../decisions/ADR-0007-one-npm-package-compiled-esm-node-22.md) (all Accepted) |
 | Status | In review |
 | Author | Architect agent |
 
-Naming used in this document: the package is `blueprint-drafter`. The CLI binary name is open
-(ADR-0006) and is written `<cli>`. The file extension `.bpd`, the header keyword `diagram`, the MCP
-tool prefix `diagram_` and the variable `BLUEPRINT_DRAFTER_WORKSPACE` are the names proposed in
-ADR-0006; if the owner chooses others, only the names change.
+Names (ADR-0006, Accepted): the package and the CLI binary are both `blueprint-drafter`; diagram
+files use the extension `.bpd` and start with the header keyword `diagram`; the MCP server is
+`blueprint-drafter` with the tool prefix `diagram_`; the workspace variable is
+`BLUEPRINT_DRAFTER_WORKSPACE`; the Agent Skill is `blueprint-drafter`.
 
 ## 1. Summary
 
@@ -24,8 +24,8 @@ library made of pure modules: a canonical line-based text format that is also th
 ELK Layered for graph layout and a dedicated sequence engine, real font metrics, a validator with a
 diagnostic catalogue and target profiles, an SVG renderer and PNG, Mermaid, draw.io and Excalidraw
 exporters. Thin adapters expose it: a CLI first, then an MCP server over stdio, an Agent Skill and a
-CI check, all shipped as one npm package. The key decisions are the five the owner accepted
-(ADR-0001 to ADR-0005); naming and packaging are proposed for the owner (ADR-0006, ADR-0007).
+CI check, all shipped as one npm package. The key decisions are recorded in ADR-0001 to ADR-0007, all
+accepted by the owner, including naming (ADR-0006) and packaging (ADR-0007).
 
 ## 2. Requirements addressed
 
@@ -85,7 +85,8 @@ CI check, all shipped as one npm package. The key decisions are the five the own
 | One canonical line format that is also the operation language | hard | ADR-0003 |
 | CLI first, then MCP server, Agent Skill, CI check; logic only in the core | hard | ADR-0004 |
 | Apache-2.0; runtime dependencies per licence policy (elkjs EPL-2.0, resvg-js MPL-2.0, IBM Plex Sans OFL-1.1) | hard | ADR-0005, NFR-11 |
-| Package name `blueprint-drafter`; product name Blueprint Drafter | hard | Issue #1, "Human decisions" (Q-6) |
+| Package and binary `blueprint-drafter`, extension `.bpd`, header keyword `diagram`; product name Blueprint Drafter | hard | Issue #1, "Human decisions" (Q-6), ADR-0006 |
+| One npm package, ESM compiled by `tsc`, Node.js 22 or later, `mcp` subcommand | hard | ADR-0007 |
 | English for all repository artifacts | hard | Issue #1, "Human decisions" 3 |
 | Two-branch project: `develop` integration, `main` releases through a human-run Pull Request | hard | Issue #1, "Human decisions" 1 |
 | Workflows, merge settings and rulesets are set up by a human | hard | Issue #2 |
@@ -245,7 +246,7 @@ Every core module depends on `model` (types only); those arrows are omitted.
 | `cli` | new (adapter) | Translate argv to `api` calls, format text or JSON output, map results to exit codes | none | `api` |
 | `mcp` | new (adapter) | Expose six typed tools over stdio that call `api` | none | `api`, MCP SDK and zod |
 | Agent Skill | new (integration) | Tell agents when and how to use the CLI or MCP, the edit loop, and that diagram content is data | `SKILL.md` | CLI, MCP |
-| CI check action | new (integration) | Composite GitHub Action that installs the package and runs `<cli> check` on the repository's diagrams | `action.yml` | CLI |
+| CI check action | new (integration) | Composite GitHub Action that installs the package and runs `blueprint-drafter check` on the repository's diagrams | `action.yml` | CLI |
 
 Runtime dependencies (ADR-0005): **elkjs** (EPL-2.0, graph layout), **fontkit** (MIT, font metrics),
 **@resvg/resvg-js** (MPL-2.0, SVG to PNG without a browser), **@modelcontextprotocol/sdk and zod**
@@ -260,7 +261,7 @@ Repository layout (proposed for the scaffold work package):
 ```text
 src/core/<module>/...      core modules above; src/core/index.ts is the api facade
 src/cli/                   CLI adapter (bin)
-src/mcp/                   MCP adapter (started by `<cli> mcp`)
+src/mcp/                   MCP adapter (started by `blueprint-drafter mcp`)
 fonts/                     unmodified IBM Plex Sans files and OFL.txt
 test/                      unit, rule, golden, contract and property tests
 bench/                     cases/ (corpus), run.ts, mermaid/ (baseline), agents/ (experiment harness)
@@ -594,7 +595,7 @@ Batch rules (FR-10, AC-12):
 Example (prototype output on a copy of benchmark case 4, study doc 5 §4.4; the product prints the same lines with the product names):
 
 ```text
-$ <cli> apply ride.bpd '~node trps label="Trips"'
+$ blueprint-drafter apply ride.bpd '~node trps label="Trips"'
 REJECTED E_UNKNOWN_ID op#1 "~node trps label="Trips"": no node 'trps' | fix: did you mean 'trips'?
 no changes written
 ```
@@ -695,16 +696,16 @@ evaluation (Q-5, R-3).
 
 | Command | Description | Main output |
 | --- | --- | --- |
-| `<cli> new <file> --type T [--title S] [--dir D]` | Create an empty diagram | `created <file>` |
-| `<cli> apply <file> [<op>...] [--ops-file F \| -] [--dry-run] [--profile P]` | Apply an atomic batch, then check | `ok <n> change(s)`, the changes (summarised above 8), the `check:` line and problems; or `REJECTED` lines and `no changes written` |
-| `<cli> check <path>... [--profile P] [--fit WxH] [--max N]` | Validate files; a directory is searched recursively for `.bpd` files in sorted order | per file: `check:` line and findings |
-| `<cli> show <file> [--around ID [--depth N]] [--ids] [--stats]` | Selective read (FR-29) | partial canonical text plus `# <n> other elements omitted` |
-| `<cli> diff <a> <b>` | Semantic diff (FR-30) | `+`, `-`, `~` lines, or `no semantic changes` |
-| `<cli> render <file> -o <out.svg \| out.png> [--theme T] [--scale N] [--no-embed-font]` | Render SVG or PNG | `wrote <out> (<w>x<h>)` |
-| `<cli> export <file> --to mermaid \| drawio \| excalidraw [-o out]` | Export; stdout without `-o` | file or text |
-| `<cli> fmt <path>... [--check]` | Rewrite canonically; with `--check`, only report non-canonical files | `formatted <file>` or the list |
-| `<cli> mcp [--workspace DIR]` | Start the MCP server on stdio | — |
-| `<cli> --version`, `<cli> --help` | Version and usage | — |
+| `blueprint-drafter new <file> --type T [--title S] [--dir D]` | Create an empty diagram | `created <file>` |
+| `blueprint-drafter apply <file> [<op>...] [--ops-file F \| -] [--dry-run] [--profile P]` | Apply an atomic batch, then check | `ok <n> change(s)`, the changes (summarised above 8), the `check:` line and problems; or `REJECTED` lines and `no changes written` |
+| `blueprint-drafter check <path>... [--profile P] [--fit WxH] [--max N]` | Validate files; a directory is searched recursively for `.bpd` files in sorted order | per file: `check:` line and findings |
+| `blueprint-drafter show <file> [--around ID [--depth N]] [--ids] [--stats]` | Selective read (FR-29) | partial canonical text plus `# <n> other elements omitted` |
+| `blueprint-drafter diff <a> <b>` | Semantic diff (FR-30) | `+`, `-`, `~` lines, or `no semantic changes` |
+| `blueprint-drafter render <file> -o <out.svg \| out.png> [--theme T] [--scale N] [--no-embed-font]` | Render SVG or PNG | `wrote <out> (<w>x<h>)` |
+| `blueprint-drafter export <file> --to mermaid \| drawio \| excalidraw [-o out]` | Export; stdout without `-o` | file or text |
+| `blueprint-drafter fmt <path>... [--check]` | Rewrite canonically; with `--check`, only report non-canonical files | `formatted <file>` or the list |
+| `blueprint-drafter mcp [--workspace DIR]` | Start the MCP server on stdio | — |
+| `blueprint-drafter --version`, `blueprint-drafter --help` | Version and usage | — |
 
 Exit codes:
 
@@ -730,7 +731,7 @@ JSON shape of `check` (one object per file, wrapped in `{"schema":1,"files":[...
 ### 7.6 MCP server
 
 - **Purpose:** typed tools for clients that prefer MCP (ADR-0004); thin translation to the API.
-- **Transport and start:** stdio, started by `<cli> mcp`; server name `blueprint-drafter`.
+- **Transport and start:** stdio, started by `blueprint-drafter mcp`; server name `blueprint-drafter`.
 - **Authentication / authorization:** the client process that starts the server is trusted to use it;
   the authorization rule is the **workspace**: the directory given by `--workspace`, else
   `BLUEPRINT_DRAFTER_WORKSPACE`, else the current directory, resolved to its real path at start.
@@ -971,18 +972,17 @@ catching coordinates and typos early (AC-7); it can be relaxed later without bre
 | One canonical line format that is also the operation language | [ADR-0003](../decisions/ADR-0003-one-canonical-line-format-as-operation-language.md) | Accepted |
 | CLI first, then MCP server, Agent Skill, CI check | [ADR-0004](../decisions/ADR-0004-cli-first-then-mcp-skill-and-ci.md) | Accepted |
 | Apache-2.0 and runtime dependency licence policy | [ADR-0005](../decisions/ADR-0005-apache-2-0-and-dependency-licence-policy.md) | Accepted |
-| CLI binary name, file extension, header keyword | [ADR-0006](../decisions/ADR-0006-name-binary-extension-and-header.md) | Proposed (owner to choose) |
-| One npm package, one binary with an `mcp` subcommand, ESM for Node.js 22 or later | [ADR-0007](../decisions/ADR-0007-one-npm-package-compiled-esm-node-22.md) | Proposed |
+| CLI binary `blueprint-drafter`, extension `.bpd`, header keyword `diagram` | [ADR-0006](../decisions/ADR-0006-name-binary-extension-and-header.md) | Accepted |
+| One npm package, one binary with an `mcp` subcommand, ESM for Node.js 22 or later | [ADR-0007](../decisions/ADR-0007-one-npm-package-compiled-esm-node-22.md) | Accepted |
 
 ## 19. Work packages for planning
 
-In dependency order. WP-1 needs the owner's decision on ADR-0006 and ADR-0007, because planning must
-not depend on Proposed ADRs; the other packages only use the names it sets up.
+In dependency order. All ADRs are Accepted, so every package can be planned now.
 
 1. **WP-1 Repository scaffold** — package manifest `blueprint-drafter`, `tsc` ESM build, `node:test`
    runner, lint with the forbidden-API rule for `src/core`, `NOTICE` and third-party notices with their
    test, bundled font files with SHA-256, benchmark corpus cases 1-10 converted to the product format
-   (A-3) — depends on none (owner decision on ADR-0006/0007).
+   (A-3) — depends on none.
 2. **WP-2 Model, format and semantic rules** — `model`, `format`, `semantic`, `limits` (byte, line,
    element, label, id, depth); syntax and semantic codes; canonical serialisation; comments; AC-6,
    AC-7, AC-10 — depends on 1.
@@ -1028,8 +1028,6 @@ not depend on Proposed ADRs; the other packages only use the names it sets up.
 
 | Item | Type | Impact | Owner |
 | --- | --- | --- | --- |
-| ADR-0006: binary name (recommended `blueprint-drafter`), extension (`.bpd`), header keyword (`diagram`) | question | Blocks WP-1 | @eliangilsierra |
-| ADR-0007: one package with an `mcp` subcommand, ESM, Node.js 22 or later | question | Blocks WP-1 | @eliangilsierra |
 | Q-4: input limit values; provisional defaults in §9 | question | NFR-9 threshold, AC-45 | @eliangilsierra with WP-6 results |
 | Q-5: profile canvases, minimum text size and heuristic thresholds (§6.4, §7.4) | question | False positives (R-3) | @eliangilsierra with the human evaluation |
 | Q-8: default profile; this design proposes `doc` | question | Default of FR-17 | @eliangilsierra |

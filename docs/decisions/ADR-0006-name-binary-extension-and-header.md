@@ -2,13 +2,16 @@
 
 ## Status
 
-Proposed
+Accepted
+
+Accepted by the repository owner (@eliangilsierra) in the "Human decisions" comment on Issue #1:
+<https://github.com/eliangilsierra/blueprint-drafter/issues/1#issuecomment-6156238827>.
 
 | Field | Value |
 | --- | --- |
 | Date proposed | 2026-10-13 |
-| Date decided | — |
-| Decided by | — |
+| Date decided | 2026-10-13 |
+| Decided by | @eliangilsierra (repository owner) |
 | Related Issue | #3 (architecture), #1 (requirements, Q-6) |
 | Supersedes | None |
 | Related ADRs | ADR-0003, ADR-0004, ADR-0007 |
@@ -33,28 +36,29 @@ Facts that constrain the choice:
 
 ## Decision
 
-Proposed for the owner's choice; the recommended option is marked.
+We will use these names (chosen by the owner, the recommended options):
 
-**CLI binary** (one of):
+| Name | Decision |
+| --- | --- |
+| CLI binary | **`blueprint-drafter`**, equal to the npm package name, so `npx blueprint-drafter ...` always runs the right package. No short alias for now: on 2026-10-13 the npm names `drafter` and `bpd` already belonged to unrelated packages (owner's check) |
+| Diagram file extension | **`.bpd`** |
+| Format header keyword | **`diagram`**: every file starts with `diagram 1 type=...` |
+| MCP server name | `blueprint-drafter` |
+| MCP tool prefix | `diagram_` (`diagram_new`, `diagram_apply`, ...) |
+| Workspace environment variable | `BLUEPRINT_DRAFTER_WORKSPACE` |
+| Agent Skill name | `blueprint-drafter` |
+
+Options that were considered for the CLI binary:
 
 | Option | Pros | Cons |
 | --- | --- | --- |
-| **A. `blueprint-drafter` (recommended)** | Equals the package name, so `npx blueprint-drafter ...` is always the right package; no collision | Long to type (agents and CI do not mind) |
-| B. `blueprint-drafter` plus a short alias such as `bpd` | Short command after a global or project install | Two names to document; `npx bpd` would resolve a different npm package, so docs must always use the long form with `npx` |
-| C. `bpd` only | Shortest | `npx bpd` runs whatever package owns `bpd`; collision unverified |
+| **A. `blueprint-drafter` (chosen)** | Equals the package name, so `npx blueprint-drafter ...` is always the right package; no collision | Long to type (agents and CI do not mind) |
+| B. `blueprint-drafter` plus a short alias such as `bpd` | Short command after a global or project install | Two names to document; `npx bpd` resolves a different npm package, so docs must always use the long form with `npx` |
+| C. `bpd` only | Shortest | `npx bpd` runs whatever package owns `bpd` (an unrelated package on 2026-10-13) |
 | D. `blueprint` | Readable | Generic; likely to collide with other tools |
 
-**File extension:** `.bpd` (recommended; short and specific, collision not verified) or `.blueprint`.
-
-**Header keyword:** `diagram` (recommended; brand-neutral and self-explanatory to models), so every
-file starts with `diagram 1 type=...`. Alternative: the binary name.
-
-**Other derived names** (follow the choice above): MCP server name `blueprint-drafter`; MCP tool
-prefix `diagram_` (`diagram_apply`, ...); workspace environment variable
-`BLUEPRINT_DRAFTER_WORKSPACE`; Skill name `blueprint-drafter`.
-
-Until the owner decides, the architecture document writes the binary as `<cli>` and uses `.bpd` and
-`diagram` as the proposed extension and keyword.
+Options considered for the extension: `.bpd` (chosen; short and specific) or `.blueprint`. For the
+header keyword: `diagram` (chosen; brand-neutral and self-explanatory to models) or the binary name.
 
 ## Alternatives
 
@@ -76,8 +80,7 @@ Until the owner decides, the architecture document writes the binary as `<cli>` 
 
 **Follow-up actions**
 
-- Owner chooses the binary name, the extension and the header keyword; the first implementation task
-  uses the decision.
+- The first implementation task (scaffold) uses these names.
 
 ## Security considerations
 
