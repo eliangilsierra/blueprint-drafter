@@ -9,8 +9,8 @@ ADR-0007).
 ## Project facts
 
 - Stack: TypeScript 6 (strict), compiled by `tsc` to ES modules plus type declarations; Node.js 22 or
-  later (`engines.node >=22`); npm with a committed `package-lock.json`; ESLint 10 with
-  typescript-eslint; tests with the built-in `node:test` runner. One package, one binary
+  later (`engines.node >=22`; ESLint 10 needs 22.13 or later to run `npm run lint`); npm with a
+  committed `package-lock.json`; ESLint 10 with typescript-eslint; tests with the built-in `node:test` runner. One package, one binary
   (`blueprint-drafter`), no bundler, no monorepo tool (ADR-0007).
 - Install: `npm ci`
 - Lint: `npm run lint` (ESLint, type-aware; `src/core/**` also forbids `eval`, `Function`, `vm`,

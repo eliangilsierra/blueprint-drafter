@@ -16,7 +16,7 @@ The format, the layout engine, the validator, the exports and the MCP server arr
 
 ## Requirements
 
-- Node.js 22 or later
+- Node.js 22 or later (22.13 or later to run `npm run lint`, because of ESLint 10)
 - npm 10 or later
 
 ## Run the checks
