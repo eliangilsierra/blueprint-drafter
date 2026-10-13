@@ -261,4 +261,3 @@ Token ratios from results.md: Excalidraw/canonical text 33.4x (case 2) to 67.7x 
 Link re-checks 2026-10-13: Mermaid 12.0.0 release (ELK bundled default; 10 Sep), excalidraw-mcp#33 (opened 2026-02-15),
   drawio-mcp#56 (opened 2026-07-21, closed same day by a maintainer), agentskills.io (open format by Anthropic; 46 clients listed)
 ```
-

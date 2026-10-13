@@ -45,8 +45,7 @@ next to an English report (answer to Q-7 in the "Human decisions" comment on Iss
 | `prototype/out/10-complex.png` | Large render (about 0.8 MB); the SVG of the same case is kept in `prototype/bench/results/10-complex.svg` |
 | Any file over 1 MB | Repository size; none of the kept evidence needs it |
 
-Links in the Spanish documents that point to the excluded files do not resolve in this archive. No
-other file was changed: the prototype and the documents are copies of the study whose content is
+No Markdown link in the archived documents points to an excluded file. No other file was changed: the prototype and the documents are copies of the study whose content is
 identical, except that Git stores text files with LF line endings (twelve originals used CRLF).
 
 ## Reproducing the measurements
