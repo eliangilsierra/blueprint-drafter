@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { existsSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { join, posix } from "node:path";
 import { test } from "node:test";
 
 import { isRecord, readJson, readText, repositoryRoot } from "./helpers.js";
@@ -20,6 +20,34 @@ test("package.json describes one ESM package with one binary (ADR-0007)", () => 
   assert.deepEqual(section("bin"), { "blueprint-drafter": "dist/cli/index.js" });
   assert.deepEqual(Object.keys(section("exports")), ["."]);
   assert.ok(Array.isArray(manifest["files"]));
+});
+
+/** Source file (relative to the repository root) that tsc -p tsconfig.build.json compiles into the published file. */
+function sourceOfBuildOutput(published: string): string {
+  const build = readJson("tsconfig.build.json");
+  const options = build["compilerOptions"];
+  assert.ok(isRecord(options), "tsconfig.build.json has no compilerOptions");
+  const { outDir, rootDir, declaration } = options;
+  assert.equal(typeof outDir, "string");
+  assert.equal(typeof rootDir, "string");
+  assert.equal(declaration, true, "the build must emit .d.ts files for the types export");
+  assert.ok(Array.isArray(build["include"]) && build["include"].includes(rootDir), "the build must include its rootDir");
+  const relative = posix.relative(String(outDir), posix.normalize(published));
+  assert.ok(!relative.startsWith(".."), `${published} is not inside the build outDir ${String(outDir)}`);
+  return posix.join(String(rootDir), relative.replace(/(\.d\.ts|\.js)$/, ".ts"));
+}
+
+test("bin and exports point at files that tsconfig.build.json produces", () => {
+  const bin = section("bin")["blueprint-drafter"];
+  assert.equal(typeof bin, "string");
+  const entry = section("exports")["."];
+  assert.ok(isRecord(entry));
+  assert.equal(sourceOfBuildOutput(String(bin)), "src/cli/index.ts");
+  assert.equal(sourceOfBuildOutput(String(entry["import"])), "src/core/index.ts");
+  assert.equal(sourceOfBuildOutput(String(entry["types"])), "src/core/index.ts");
+  for (const source of ["src/cli/index.ts", "src/core/index.ts"]) {
+    assert.ok(existsSync(join(repositoryRoot, source)), `${source} does not exist`);
+  }
 });
 
 test("package.json has the scripts of the toolchain", () => {
