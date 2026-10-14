@@ -12,11 +12,11 @@ are admitted is ADR-0005 (`docs/decisions/`).
   platform package and every transitive package, plus the bundled font data. Development-only
   dependencies are not distributed and are not listed.
 - Versions: the exact versions pinned for the five direct dependencies in the repository scaffold
-  (per PR #52: elkjs 0.12.0, fontkit 2.0.4, @resvg/resvg-js 2.6.2, @modelcontextprotocol/sdk 1.32.1,
-  zod 4.6.7). The tree was resolved with `npm install --package-lock-only --ignore-scripts` in a
+  (elkjs 0.12.0, fontkit 2.0.4, @resvg/resvg-js 2.6.2, @modelcontextprotocol/sdk 1.32.1, zod 4.6.7).
+  The tree was resolved with `npm install --package-lock-only --ignore-scripts` in a
   temporary directory outside this repository and read back with `npm ci --ignore-scripts`; its
-  production part is identical to the production tree in the lockfile of PR #52 (121 lockfile
-  entries). No install script ran and no dependency was added to this repository.
+  production part is identical to the production tree in the lockfile of the repository scaffold
+  (121 lockfile entries). No install script ran and no dependency was added to this repository.
 - Entries: one per distinct package name and version (118). `content-type` appears twice, as 1.0.5 and
   2.1.0; in the lockfile 2.1.0 is installed in four places, which explains 121 lockfile entries for 118
   entries here. 12 of the 118 are the optional `@resvg/resvg-js` platform packages, one entry each.
@@ -27,10 +27,13 @@ are admitted is ADR-0005 (`docs/decisions/`).
   are omitted; names, years and holders are unchanged.
 - `@ibm/plex-sans` is not used: it is neither a dependency nor a development dependency. Its
   `postinstall` script runs a telemetry tool. The font is vendored instead (see "Bundled data").
-- Not covered: the native code inside the `@resvg/resvg-js` platform binaries is compiled from Rust
-  crates that are not npm packages. It is distributed as part of the MPL-2.0 packages below, whose
-  source is at the repository given in each entry.
-- The comparison of this file with the production tree is automated by #49.
+- Not covered: the native binaries of the `@resvg/resvg-js` platform packages are compiled from Rust
+  crates that are not npm packages. The `resvg` crate in them comes from the fork named in the
+  `Source Code Form` lines below (MPL-2.0), and `Cargo.toml` of the same tag also replaces the
+  `woff2` crate with the fork <https://github.com/yisibl/woff2-rs> (branch `fix-total-compressed-size`).
+  The other Rust crates compiled into the binaries keep their own licences, which are not itemised
+  in this file; the tag has no `Cargo.lock`, so their exact versions are not pinned here.
+- The comparison of this file with the production tree is to be automated by a notices test.
 
 ## Licence summary
 
@@ -272,7 +275,7 @@ SOFTWARE.
 
 - Licence: MPL-2.0
 - Source: <https://github.com/yisibl/resvg-js>
-- Source Code Form: the source of this package is available from <https://github.com/yisibl/resvg-js/tree/v2.6.2>; it is used unmodified. The licence text is in "MPL-2.0 licence text" below.
+- Source Code Form: the source of this package is available from <https://github.com/yisibl/resvg-js/tree/v2.6.2>. The `Cargo.toml` at that tag replaces the `resvg` crate with the fork <https://github.com/zimond/resvg> at revision `3495d870` (`[patch.crates-io]`); that fork is the `resvg` source compiled into the native binaries. It is used unmodified. The licence text is in "MPL-2.0 licence text" below.
 
 This package ships the unmodified MPL-2.0 text as its licence file; it is reproduced once in the section named above.
 
@@ -281,7 +284,7 @@ This package ships the unmodified MPL-2.0 text as its licence file; it is reprod
 - Licence: MPL-2.0
 - Source: <https://github.com/yisibl/resvg-js>
 - Optional platform package of `@resvg/resvg-js`; contains the prebuilt `resvg` native binary for one platform, distributed unmodified.
-- Source Code Form: the source of this package is available from <https://github.com/yisibl/resvg-js/tree/v2.6.2>; it is used unmodified. The licence text is in "MPL-2.0 licence text" below.
+- Source Code Form: the source of this package is available from <https://github.com/yisibl/resvg-js/tree/v2.6.2>. The `Cargo.toml` at that tag replaces the `resvg` crate with the fork <https://github.com/zimond/resvg> at revision `3495d870` (`[patch.crates-io]`); that fork is the `resvg` source compiled into the native binaries. It is used unmodified. The licence text is in "MPL-2.0 licence text" below.
 
 This package ships no licence file; its `package.json` declares MPL-2.0 (full text below).
 
@@ -290,7 +293,7 @@ This package ships no licence file; its `package.json` declares MPL-2.0 (full te
 - Licence: MPL-2.0
 - Source: <https://github.com/yisibl/resvg-js>
 - Optional platform package of `@resvg/resvg-js`; contains the prebuilt `resvg` native binary for one platform, distributed unmodified.
-- Source Code Form: the source of this package is available from <https://github.com/yisibl/resvg-js/tree/v2.6.2>; it is used unmodified. The licence text is in "MPL-2.0 licence text" below.
+- Source Code Form: the source of this package is available from <https://github.com/yisibl/resvg-js/tree/v2.6.2>. The `Cargo.toml` at that tag replaces the `resvg` crate with the fork <https://github.com/zimond/resvg> at revision `3495d870` (`[patch.crates-io]`); that fork is the `resvg` source compiled into the native binaries. It is used unmodified. The licence text is in "MPL-2.0 licence text" below.
 
 This package ships no licence file; its `package.json` declares MPL-2.0 (full text below).
 
@@ -299,7 +302,7 @@ This package ships no licence file; its `package.json` declares MPL-2.0 (full te
 - Licence: MPL-2.0
 - Source: <https://github.com/yisibl/resvg-js>
 - Optional platform package of `@resvg/resvg-js`; contains the prebuilt `resvg` native binary for one platform, distributed unmodified.
-- Source Code Form: the source of this package is available from <https://github.com/yisibl/resvg-js/tree/v2.6.2>; it is used unmodified. The licence text is in "MPL-2.0 licence text" below.
+- Source Code Form: the source of this package is available from <https://github.com/yisibl/resvg-js/tree/v2.6.2>. The `Cargo.toml` at that tag replaces the `resvg` crate with the fork <https://github.com/zimond/resvg> at revision `3495d870` (`[patch.crates-io]`); that fork is the `resvg` source compiled into the native binaries. It is used unmodified. The licence text is in "MPL-2.0 licence text" below.
 
 This package ships no licence file; its `package.json` declares MPL-2.0 (full text below).
 
@@ -308,7 +311,7 @@ This package ships no licence file; its `package.json` declares MPL-2.0 (full te
 - Licence: MPL-2.0
 - Source: <https://github.com/yisibl/resvg-js>
 - Optional platform package of `@resvg/resvg-js`; contains the prebuilt `resvg` native binary for one platform, distributed unmodified.
-- Source Code Form: the source of this package is available from <https://github.com/yisibl/resvg-js/tree/v2.6.2>; it is used unmodified. The licence text is in "MPL-2.0 licence text" below.
+- Source Code Form: the source of this package is available from <https://github.com/yisibl/resvg-js/tree/v2.6.2>. The `Cargo.toml` at that tag replaces the `resvg` crate with the fork <https://github.com/zimond/resvg> at revision `3495d870` (`[patch.crates-io]`); that fork is the `resvg` source compiled into the native binaries. It is used unmodified. The licence text is in "MPL-2.0 licence text" below.
 
 This package ships no licence file; its `package.json` declares MPL-2.0 (full text below).
 
@@ -317,7 +320,7 @@ This package ships no licence file; its `package.json` declares MPL-2.0 (full te
 - Licence: MPL-2.0
 - Source: <https://github.com/yisibl/resvg-js>
 - Optional platform package of `@resvg/resvg-js`; contains the prebuilt `resvg` native binary for one platform, distributed unmodified.
-- Source Code Form: the source of this package is available from <https://github.com/yisibl/resvg-js/tree/v2.6.2>; it is used unmodified. The licence text is in "MPL-2.0 licence text" below.
+- Source Code Form: the source of this package is available from <https://github.com/yisibl/resvg-js/tree/v2.6.2>. The `Cargo.toml` at that tag replaces the `resvg` crate with the fork <https://github.com/zimond/resvg> at revision `3495d870` (`[patch.crates-io]`); that fork is the `resvg` source compiled into the native binaries. It is used unmodified. The licence text is in "MPL-2.0 licence text" below.
 
 This package ships no licence file; its `package.json` declares MPL-2.0 (full text below).
 
@@ -326,7 +329,7 @@ This package ships no licence file; its `package.json` declares MPL-2.0 (full te
 - Licence: MPL-2.0
 - Source: <https://github.com/yisibl/resvg-js>
 - Optional platform package of `@resvg/resvg-js`; contains the prebuilt `resvg` native binary for one platform, distributed unmodified.
-- Source Code Form: the source of this package is available from <https://github.com/yisibl/resvg-js/tree/v2.6.2>; it is used unmodified. The licence text is in "MPL-2.0 licence text" below.
+- Source Code Form: the source of this package is available from <https://github.com/yisibl/resvg-js/tree/v2.6.2>. The `Cargo.toml` at that tag replaces the `resvg` crate with the fork <https://github.com/zimond/resvg> at revision `3495d870` (`[patch.crates-io]`); that fork is the `resvg` source compiled into the native binaries. It is used unmodified. The licence text is in "MPL-2.0 licence text" below.
 
 This package ships no licence file; its `package.json` declares MPL-2.0 (full text below).
 
@@ -335,7 +338,7 @@ This package ships no licence file; its `package.json` declares MPL-2.0 (full te
 - Licence: MPL-2.0
 - Source: <https://github.com/yisibl/resvg-js>
 - Optional platform package of `@resvg/resvg-js`; contains the prebuilt `resvg` native binary for one platform, distributed unmodified.
-- Source Code Form: the source of this package is available from <https://github.com/yisibl/resvg-js/tree/v2.6.2>; it is used unmodified. The licence text is in "MPL-2.0 licence text" below.
+- Source Code Form: the source of this package is available from <https://github.com/yisibl/resvg-js/tree/v2.6.2>. The `Cargo.toml` at that tag replaces the `resvg` crate with the fork <https://github.com/zimond/resvg> at revision `3495d870` (`[patch.crates-io]`); that fork is the `resvg` source compiled into the native binaries. It is used unmodified. The licence text is in "MPL-2.0 licence text" below.
 
 This package ships no licence file; its `package.json` declares MPL-2.0 (full text below).
 
@@ -344,7 +347,7 @@ This package ships no licence file; its `package.json` declares MPL-2.0 (full te
 - Licence: MPL-2.0
 - Source: <https://github.com/yisibl/resvg-js>
 - Optional platform package of `@resvg/resvg-js`; contains the prebuilt `resvg` native binary for one platform, distributed unmodified.
-- Source Code Form: the source of this package is available from <https://github.com/yisibl/resvg-js/tree/v2.6.2>; it is used unmodified. The licence text is in "MPL-2.0 licence text" below.
+- Source Code Form: the source of this package is available from <https://github.com/yisibl/resvg-js/tree/v2.6.2>. The `Cargo.toml` at that tag replaces the `resvg` crate with the fork <https://github.com/zimond/resvg> at revision `3495d870` (`[patch.crates-io]`); that fork is the `resvg` source compiled into the native binaries. It is used unmodified. The licence text is in "MPL-2.0 licence text" below.
 
 This package ships no licence file; its `package.json` declares MPL-2.0 (full text below).
 
@@ -353,7 +356,7 @@ This package ships no licence file; its `package.json` declares MPL-2.0 (full te
 - Licence: MPL-2.0
 - Source: <https://github.com/yisibl/resvg-js>
 - Optional platform package of `@resvg/resvg-js`; contains the prebuilt `resvg` native binary for one platform, distributed unmodified.
-- Source Code Form: the source of this package is available from <https://github.com/yisibl/resvg-js/tree/v2.6.2>; it is used unmodified. The licence text is in "MPL-2.0 licence text" below.
+- Source Code Form: the source of this package is available from <https://github.com/yisibl/resvg-js/tree/v2.6.2>. The `Cargo.toml` at that tag replaces the `resvg` crate with the fork <https://github.com/zimond/resvg> at revision `3495d870` (`[patch.crates-io]`); that fork is the `resvg` source compiled into the native binaries. It is used unmodified. The licence text is in "MPL-2.0 licence text" below.
 
 This package ships no licence file; its `package.json` declares MPL-2.0 (full text below).
 
@@ -362,7 +365,7 @@ This package ships no licence file; its `package.json` declares MPL-2.0 (full te
 - Licence: MPL-2.0
 - Source: <https://github.com/yisibl/resvg-js>
 - Optional platform package of `@resvg/resvg-js`; contains the prebuilt `resvg` native binary for one platform, distributed unmodified.
-- Source Code Form: the source of this package is available from <https://github.com/yisibl/resvg-js/tree/v2.6.2>; it is used unmodified. The licence text is in "MPL-2.0 licence text" below.
+- Source Code Form: the source of this package is available from <https://github.com/yisibl/resvg-js/tree/v2.6.2>. The `Cargo.toml` at that tag replaces the `resvg` crate with the fork <https://github.com/zimond/resvg> at revision `3495d870` (`[patch.crates-io]`); that fork is the `resvg` source compiled into the native binaries. It is used unmodified. The licence text is in "MPL-2.0 licence text" below.
 
 This package ships no licence file; its `package.json` declares MPL-2.0 (full text below).
 
@@ -371,7 +374,7 @@ This package ships no licence file; its `package.json` declares MPL-2.0 (full te
 - Licence: MPL-2.0
 - Source: <https://github.com/yisibl/resvg-js>
 - Optional platform package of `@resvg/resvg-js`; contains the prebuilt `resvg` native binary for one platform, distributed unmodified.
-- Source Code Form: the source of this package is available from <https://github.com/yisibl/resvg-js/tree/v2.6.2>; it is used unmodified. The licence text is in "MPL-2.0 licence text" below.
+- Source Code Form: the source of this package is available from <https://github.com/yisibl/resvg-js/tree/v2.6.2>. The `Cargo.toml` at that tag replaces the `resvg` crate with the fork <https://github.com/zimond/resvg> at revision `3495d870` (`[patch.crates-io]`); that fork is the `resvg` source compiled into the native binaries. It is used unmodified. The licence text is in "MPL-2.0 licence text" below.
 
 This package ships no licence file; its `package.json` declares MPL-2.0 (full text below).
 
@@ -380,7 +383,7 @@ This package ships no licence file; its `package.json` declares MPL-2.0 (full te
 - Licence: MPL-2.0
 - Source: <https://github.com/yisibl/resvg-js>
 - Optional platform package of `@resvg/resvg-js`; contains the prebuilt `resvg` native binary for one platform, distributed unmodified.
-- Source Code Form: the source of this package is available from <https://github.com/yisibl/resvg-js/tree/v2.6.2>; it is used unmodified. The licence text is in "MPL-2.0 licence text" below.
+- Source Code Form: the source of this package is available from <https://github.com/yisibl/resvg-js/tree/v2.6.2>. The `Cargo.toml` at that tag replaces the `resvg` crate with the fork <https://github.com/zimond/resvg> at revision `3495d870` (`[patch.crates-io]`); that fork is the `resvg` source compiled into the native binaries. It is used unmodified. The licence text is in "MPL-2.0 licence text" below.
 
 This package ships no licence file; its `package.json` declares MPL-2.0 (full text below).
 
