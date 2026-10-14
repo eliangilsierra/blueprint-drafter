@@ -1,0 +1,84 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Mermaid baseline harness</title>
+<style>body{font-family:sans-serif;margin:16px;background:#fff} .case{margin:24px 0;border-top:1px solid #ccc} pre{font-size:11px}</style></head>
+<body>
+<h1>Mermaid 12 baseline</h1>
+<div id="status">loading…</div>
+<div id="out"></div>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@12.2.0/dist/mermaid.esm.min.mjs';
+const status = document.getElementById('status');
+const inputs = await (await fetch('inputs.json')).json();
+const layoutMode = new URLSearchParams(location.search).get('layout') || 'default';
+
+function svgPoint(svg, el, x, y) {
+  const m = svg.getScreenCTM().inverse().multiply(el.getScreenCTM());
+  const p = new DOMPoint(x, y).matrixTransform(m);
+  return [Math.round(p.x * 10) / 10, Math.round(p.y * 10) / 10];
+}
+function rectOf(svg, el) {
+  const b = el.getBBox();
+  const pts = [[b.x, b.y], [b.x + b.width, b.y], [b.x, b.y + b.height], [b.x + b.width, b.y + b.height]].map(([x, y]) => svgPoint(svg, el, x, y));
+  const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+  return { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
+}
+const idOf = (raw) => { const m = /flowchart-(.+)-\d+$/.exec(raw || ''); return m ? m[1] : null; };
+
+const results = {};
+for (const [name, src] of Object.entries(inputs)) {
+  const cfg = { startOnLoad: false, securityLevel: 'strict', flowchart: { useMaxWidth: false, htmlLabels: true } };
+  if (layoutMode !== 'default') cfg.layout = layoutMode;
+  mermaid.initialize(cfg);
+  const host = document.createElement('div'); host.className = 'case'; host.innerHTML = `<h3>${name}</h3>`;
+  document.getElementById('out').appendChild(host);
+  try {
+    const t0 = performance.now();
+    const { svg: svgText } = await mermaid.render('m_' + name.replace(/\W/g, '_') + '_' + layoutMode, src);
+    const ms = performance.now() - t0;
+    const wrap = document.createElement('div'); wrap.innerHTML = svgText; host.appendChild(wrap);
+    const svg = wrap.querySelector('svg');
+    const vb = svg.viewBox.baseVal;
+    const nodes = [], edges = [], clusters = [];
+    for (const g of svg.querySelectorAll('g.node')) {
+      const id = idOf(g.id) ?? g.getAttribute('data-id');
+      const shapeEl = g.querySelector(':scope > rect, :scope > polygon, :scope > path, :scope > g > path, :scope > circle, :scope > ellipse') || g;
+      const shape = rectOf(svg, shapeEl);
+      const labelEl = g.querySelector('.label') || g;
+      const label = rectOf(svg, labelEl);
+      // ancho real del texto (HTML): scrollWidth del contenido frente al ancho disponible
+      const inner = g.querySelector('foreignObject div, foreignObject span');
+      const fo = g.querySelector('foreignObject');
+      const textW = inner ? inner.scrollWidth : label.w;
+      const foW = fo ? fo.width.baseVal.value : label.w;
+      const poly = g.querySelector('polygon');
+      nodes.push({ id, shape, label, textW, foW, diamond: !!poly && poly.points.length === 4 });
+    }
+    for (const c of svg.querySelectorAll('g.cluster')) {
+      const r = c.querySelector('rect');
+      const id = (c.getAttribute('data-id') || c.id || '').replace(/^.*?-?(?=[^-]+$)/, '');
+      if (r) clusters.push({ id: c.getAttribute('data-id') || c.id, rect: rectOf(svg, r), title: c.querySelector('.cluster-label') ? rectOf(svg, c.querySelector('.cluster-label')) : null });
+    }
+    for (const p of svg.querySelectorAll('path.flowchart-link, g.edgePaths path')) {
+      const len = p.getTotalLength();
+      const pts = [];
+      for (let s = 0; s <= len; s += 4) { const q = p.getPointAtLength(s); pts.push(svgPoint(svg, p, q.x, q.y)); }
+      const q = p.getPointAtLength(len); pts.push(svgPoint(svg, p, q.x, q.y));
+      edges.push({ id: p.getAttribute('data-id') || p.id, pts });
+    }
+    const labels = [];
+    for (const l of svg.querySelectorAll('g.edgeLabel')) {
+      const r = rectOf(svg, l);
+      if (r.w < 1 || r.h < 1) continue;
+      const inner = l.querySelector('[data-id]');
+      labels.push({ forId: inner ? inner.getAttribute('data-id') : (l.getAttribute('data-id') || l.id), rect: r, text: l.textContent.trim() });
+    }
+    results[name] = { ms, viewBox: [vb.x, vb.y, vb.width, vb.height], nodes, clusters, edges, labels };
+  } catch (e) {
+    results[name] = { error: String(e && e.message || e) };
+  }
+}
+await fetch('/results/mermaid-' + layoutMode + '.json', { method: 'POST', body: JSON.stringify(results) });
+window.__done = true;
+status.textContent = 'done: ' + Object.keys(results).length + ' cases (' + layoutMode + ')';
+</script>
+</body></html>

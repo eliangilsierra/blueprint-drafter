@@ -1,0 +1,32 @@
+# Ejemplo de workflow: valida todos los .plano del PR y publica los SVG como artefacto.
+name: plano-check
+on:
+  pull_request:
+    paths: ['**/*.plano']
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install plano
+        run: npm ci --prefix tools/plano
+      - name: Validate diagrams
+        run: |
+          status=0
+          for f in $(git ls-files '*.plano'); do
+            echo "::group::$f"
+            node tools/plano/src/cli.ts check "$f" || status=1
+            node tools/plano/src/cli.ts render "$f" -o "rendered/${f%.plano}.svg"
+            echo "::endgroup::"
+          done
+          exit $status
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: diagrams
+          path: rendered/

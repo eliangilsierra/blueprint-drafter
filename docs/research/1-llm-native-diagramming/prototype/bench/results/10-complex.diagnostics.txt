@@ -1,0 +1,5 @@
+W W_EDGE_DETOUR checkout>inventory — edge 'checkout>inventory' takes a 3399px detour (direct ≈ 1023px) | fix: grouping forces this; consider ~node inventory in= (leave 'fulfil') or dir change
+W W_ILLEGIBLE_AT_FIT — smallest text renders at 3.9px when fitted to 1600x1000 | fix: split into views (e.g. one per boundary) or switch dir
+I I_CROSSINGS — 8 edge crossings (0.18 per edge)
+I I_ASPECT — aspect ratio 4.1:1 | fix: try dir=TB
+I I_DENSITY — 40 elements in one view; C4 suggests focused views | fix: split by boundary

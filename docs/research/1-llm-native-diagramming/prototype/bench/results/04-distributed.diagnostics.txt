@@ -1,0 +1,2 @@
+W W_EDGE_DETOUR events>pay — edge 'events>pay' takes a 1847px detour (direct ≈ 899px) | fix: grouping forces this; consider ~node pay in= (leave 'core') or dir change
+W W_EDGE_DETOUR events>notify — edge 'events>notify' takes a 1668px detour (direct ≈ 720px) | fix: grouping forces this; consider ~node notify in= (leave 'core') or dir change

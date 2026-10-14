@@ -1,0 +1,11 @@
+{
+  "//": "Ejemplo: tras cualquier edición de un .plano o una llamada al MCP de plano, ejecutar 'plano check' y devolver los problemas al agente. Script en hooks/plano-check-hook.mjs.",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|mcp__plano__plano_apply",
+        "hooks": [{ "type": "command", "command": "node integrations/hooks/plano-check-hook.mjs" }]
+      }
+    ]
+  }
+}

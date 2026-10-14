@@ -1,0 +1,146 @@
+[
+ {
+  "case": "01-flow",
+  "png": "891x1336",
+  "visualTokens": 1536,
+  "effectiveScaleVs1x": 1
+ },
+ {
+  "case": "01-flow",
+  "png": "1782x2672",
+  "visualTokens": 4704,
+  "effectiveScaleVs1x": 1.74
+ },
+ {
+  "case": "01-flow",
+  "png": "diagnósticos de texto",
+  "visualTokens": 45,
+  "effectiveScaleVs1x": null
+ },
+ {
+  "case": "02-c4-container",
+  "png": "655x1254",
+  "visualTokens": 1080,
+  "effectiveScaleVs1x": 1
+ },
+ {
+  "case": "02-c4-container",
+  "png": "1310x2508",
+  "visualTokens": 4230,
+  "effectiveScaleVs1x": 2
+ },
+ {
+  "case": "02-c4-container",
+  "png": "diagnósticos de texto",
+  "visualTokens": 1,
+  "effectiveScaleVs1x": null
+ },
+ {
+  "case": "03-components",
+  "png": "1502x494",
+  "visualTokens": 972,
+  "effectiveScaleVs1x": 1
+ },
+ {
+  "case": "03-components",
+  "png": "3004x988",
+  "visualTokens": 2852,
+  "effectiveScaleVs1x": 1.72
+ },
+ {
+  "case": "03-components",
+  "png": "diagnósticos de texto",
+  "visualTokens": 38,
+  "effectiveScaleVs1x": null
+ },
+ {
+  "case": "04-distributed",
+  "png": "1807x902",
+  "visualTokens": 2145,
+  "effectiveScaleVs1x": 1
+ },
+ {
+  "case": "04-distributed",
+  "png": "3614x1804",
+  "visualTokens": 4232,
+  "effectiveScaleVs1x": 1.43
+ },
+ {
+  "case": "04-distributed",
+  "png": "diagnósticos de texto",
+  "visualTokens": 108,
+  "effectiveScaleVs1x": null
+ },
+ {
+  "case": "05-sequence",
+  "png": "1051x812",
+  "visualTokens": 1102,
+  "effectiveScaleVs1x": 1
+ },
+ {
+  "case": "05-sequence",
+  "png": "2102x1624",
+  "visualTokens": 4408,
+  "effectiveScaleVs1x": 2
+ },
+ {
+  "case": "05-sequence",
+  "png": "diagnósticos de texto",
+  "visualTokens": 14,
+  "effectiveScaleVs1x": null
+ },
+ {
+  "case": "06-long-labels",
+  "png": "2267x381",
+  "visualTokens": 1134,
+  "effectiveScaleVs1x": 1
+ },
+ {
+  "case": "06-long-labels",
+  "png": "4534x762",
+  "visualTokens": 1472,
+  "effectiveScaleVs1x": 1.14
+ },
+ {
+  "case": "06-long-labels",
+  "png": "diagnósticos de texto",
+  "visualTokens": 66,
+  "effectiveScaleVs1x": null
+ },
+ {
+  "case": "07-groups",
+  "png": "2235x673",
+  "visualTokens": 2000,
+  "effectiveScaleVs1x": 1
+ },
+ {
+  "case": "07-groups",
+  "png": "4470x1346",
+  "visualTokens": 2576,
+  "effectiveScaleVs1x": 1.15
+ },
+ {
+  "case": "07-groups",
+  "png": "diagnósticos de texto",
+  "visualTokens": 145,
+  "effectiveScaleVs1x": null
+ },
+ {
+  "case": "10-complex",
+  "png": "4262x1032",
+  "visualTokens": 2116,
+  "effectiveScaleVs1x": 0.6
+ },
+ {
+  "case": "10-complex",
+  "png": "8524x2064",
+  "visualTokens": 2116,
+  "effectiveScaleVs1x": 0.6
+ },
+ {
+  "case": "10-complex",
+  "png": "diagnósticos de texto",
+  "visualTokens": 164,
+  "effectiveScaleVs1x": null
+ }
+]

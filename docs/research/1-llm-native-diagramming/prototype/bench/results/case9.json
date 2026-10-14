@@ -1,0 +1,56 @@
+{
+ "ops": [
+  "+node payments module \"payments\" in=app tags=code",
+  "+node stripe external \"Stripe API\" tags=code",
+  "+edge api>payments \"uses\" src=code",
+  "+edge payments>db \"uses\" src=code",
+  "+edge payments>events \"uses\" src=code",
+  "+edge payments>stripe \"via stripe\" src=code",
+  "-node legacy"
+ ],
+ "changes": [
+  "+node payments module \"payments\" in=app tags=code",
+  "+node stripe external \"Stripe API\" tags=code",
+  "+edge api>payments \"uses\" src=code",
+  "+edge payments>db \"uses\" src=code",
+  "+edge payments>events \"uses\" src=code",
+  "+edge payments>stripe \"via stripe\" src=code",
+  "-node legacy (+1 edges)"
+ ],
+ "introducedErrors": 0,
+ "check": {
+  "errors": 0,
+  "warnings": 0,
+  "crossings": 1
+ },
+ "curationPreserved": true,
+ "regenerationWouldLoseCuration": true,
+ "tokens": {
+  "syncOps": 77,
+  "fullRegeneratedFile": 286
+ },
+ "stability": {
+  "stableMode": "repair",
+  "stable": {
+   "common": 8,
+   "meanShift": 8.39350219522909,
+   "maxShift": 13.716005853944239,
+   "moved20": 0,
+   "tauX": 1,
+   "tauY": 0.9259259259259259,
+   "sizeChange": 0.24152542372881358
+  },
+  "fresh": {
+   "common": 8,
+   "meanShift": 34.63552241441378,
+   "maxShift": 92.04482603601355,
+   "moved20": 5,
+   "tauX": 1,
+   "tauY": 0.5555555555555556,
+   "sizeChange": 0.24407112977684453
+  },
+  "stableErrors": 0,
+  "stableCrossings": 3,
+  "freshCrossings": 1
+ }
+}

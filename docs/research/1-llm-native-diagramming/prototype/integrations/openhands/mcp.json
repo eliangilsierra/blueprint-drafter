@@ -1,0 +1,10 @@
+{
+  "//": "OpenHands CLI >= 1.0: ~/.openhands/mcp.json (formato JSON; antes de 1.0 era TOML). También: openhands mcp add plano --transport stdio ...",
+  "mcpServers": {
+    "plano": {
+      "command": "node",
+      "args": ["/workspace/tools/plano/src/mcp.ts"],
+      "env": { "PLANO_WORKSPACE": "/workspace" }
+    }
+  }
+}

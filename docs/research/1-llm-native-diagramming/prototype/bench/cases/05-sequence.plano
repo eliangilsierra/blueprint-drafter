@@ -1,0 +1,20 @@
+plano 1 type=sequence dir=TB title="Checkout with 3-D Secure"
+node user actor "Shopper"
+node web participant "Web Store"
+node orders participant "Order Service"
+node pay participant "Payment Service"
+node psp participant "Card Processor"
+node bank participant "Issuer Bank"
+edge user>web "Click Pay now"
+edge web>orders "POST /orders"
+edge orders>orders "Validate cart and reserve stock"
+edge orders>pay "Authorize payment"
+edge pay>psp "Create payment intent"
+edge psp>bank "3-D Secure challenge"
+edge bank>user "One-time password prompt" style=async
+edge user>bank "Enter OTP"
+edge bank>psp "Authentication result" style=reply
+edge psp>pay "Authorized" style=reply
+edge pay>orders "Payment confirmed" style=reply
+edge orders>web "201 Created" style=reply
+edge web>user "Show confirmation page" style=reply

@@ -1,0 +1,7 @@
+# Ejemplo de hook para Codex (sintaxis según developers.openai.com/codex/hooks, consulta 2026-10-13).
+# Los hooks no gestionados deben revisarse y marcarse como de confianza con /hooks antes de ejecutarse.
+[[hooks.PostToolUse]]
+matcher = "^(apply_patch|mcp__plano__plano_apply)$"
+[[hooks.PostToolUse.hooks]]
+type = "command"
+command = "node integrations/hooks/plano-check-hook.mjs"
