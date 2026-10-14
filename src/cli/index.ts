@@ -50,15 +50,40 @@ function readPackageVersion(): string {
   }
 }
 
+const MAX_QUOTED_LENGTH = 80;
+const UNSAFE_CHARACTERS = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu;
+
+/**
+ * Quotes untrusted text for a message: drops control, format (bidirectional, zero-width) and line or
+ * paragraph separator characters, cuts it to MAX_QUOTED_LENGTH characters and quotes it as a JSON string.
+ */
+function quote(text: string): string {
+  const characters = Array.from(text.replace(UNSAFE_CHARACTERS, ""));
+  const shown =
+    characters.length > MAX_QUOTED_LENGTH ? `${characters.slice(0, MAX_QUOTED_LENGTH).join("")}...` : characters.join("");
+  return JSON.stringify(shown);
+}
+
+function isOption(argument: string | undefined): boolean {
+  return argument === "--help" || argument === "--version";
+}
+
 /** Exit codes follow the architecture (section 7.5): 0 success, 2 could not evaluate (usage error). */
 function run(args: readonly string[]): CliResult {
-  if (args.includes("--help")) {
+  const [first] = args;
+  if (args.length === 1 && first === "--help") {
     return { exitCode: 0, stdout: USAGE, stderr: "" };
   }
-  if (args.includes("--version")) {
+  if (args.length === 1 && first === "--version") {
     return { exitCode: 0, stdout: `${readPackageVersion()}\n`, stderr: "" };
   }
-  const reason = args.length === 0 ? "no command given" : `unknown argument: ${args.join(" ")}`;
+  let reason = "no command given";
+  if (args.length > 0) {
+    // Echo the first argument that is not a lone known option, and only that one.
+    const unknown = args.find((argument) => !isOption(argument));
+    reason =
+      unknown === undefined ? `unexpected argument: ${quote(args[1] ?? "")}` : `unknown argument: ${quote(unknown)}`;
+  }
   return { exitCode: 2, stdout: "", stderr: `${PACKAGE_NAME}: ${reason}\n\n${USAGE}` };
 }
 
