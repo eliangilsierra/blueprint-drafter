@@ -1,0 +1,30 @@
+diagram 1 type=architecture title="Multi-region deployment with nested boundaries"
+group aws zone "AWS"
+group onprem boundary "On-premises data centre"
+group eu zone "eu-west-1" in=aws
+group us zone "us-east-1" in=aws
+group euapp cluster "EKS cluster" in=eu
+group usapp cluster "EKS cluster" in=us
+node cdn gateway "CloudFront CDN"
+node euapi service "API" in=euapp
+node euworker service "Workers" in=euapp
+node eudb db "Aurora (primary)" in=eu
+node usapi service "API" in=usapp
+node usworker service "Workers" in=usapp
+node usdb db "Aurora (replica)" in=us
+node sqs queue "SQS Jobs" in=aws
+node erp external "SAP ERP" in=onprem
+node ldap external "Active Directory" in=onprem
+edge cdn>euapi "EU traffic"
+edge cdn>usapi "US traffic"
+edge euapi>eudb "reads/writes"
+edge usapi>usdb "reads"
+edge usapi>eudb "writes (cross-region)"
+edge eudb>usdb "replicates" style=async
+edge euapi>sqs "enqueues" style=async
+edge usapi>sqs "enqueues" style=async
+edge sqs>euworker "delivers" style=async
+edge sqs>usworker "delivers" style=async
+edge euworker>erp "posts orders" tech=VPN
+edge euapi>ldap "authenticates" tech=LDAPS
+edge usapi>ldap "authenticates" tech=LDAPS
