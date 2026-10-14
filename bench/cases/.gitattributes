@@ -1,0 +1,2 @@
+# The corpus is read byte for byte (determinism tests): keep LF on every platform.
+* text eol=lf
