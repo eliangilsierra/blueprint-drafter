@@ -59,7 +59,7 @@ with type declarations by `tsc`, for **Node.js 22 or later** (CI covers the supp
 **Positive**
 
 - One version number, one install, one release process.
-- `npx -y blueprint-drafter mcp` and `npx blueprint-drafter check` work without configuration.
+- `npx -y blueprint-drafter@<x.y.z> mcp` and `npx --yes blueprint-drafter@<x.y.z> check` work without configuration.
 
 **Negative**
 
@@ -70,6 +70,9 @@ with type declarations by `tsc`, for **Node.js 22 or later** (CI covers the supp
 **Follow-up actions**
 
 - Repository scaffold work package (package manifest, `tsc` build, test runner, lint rules).
+- The unpinned `npx` forms in the Decision above illustrate the command shape only. Every published
+  instruction (README and guides, Skill, CI action, MCP configuration examples) uses the pinned form
+  `npx -y blueprint-drafter@<x.y.z> ...` (Security considerations; architecture sections 7.7 and 9).
 
 ## Security considerations
 

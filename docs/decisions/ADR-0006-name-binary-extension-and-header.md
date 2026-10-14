@@ -77,11 +77,13 @@ header keyword: `diagram` (chosen; brand-neutral and self-explanatory to models)
 **Negative**
 
 - Option A is long; a short alias can be added later without breaking anything (additive).
-- Whether `.bpd` is used by unrelated tools was not verified; the risk (file-association confusion only) is accepted.
+- Whether `.bpd` is used by unrelated tools was not verified; the risk (file-association confusion only) is recorded for the owner in architecture section 20.
 
 **Follow-up actions**
 
 - The first implementation task (scaffold) uses these names.
+- The unpinned `npx blueprint-drafter ...` forms in the Decision illustrate the name only. Every published
+  instruction uses the pinned form `npx --yes blueprint-drafter@<x.y.z> ...` (Security considerations).
 - Registry check recorded after acceptance (security review of PR #4, 2026-10-13): `npm view` returned E404 for `blueprint-drafter`, `blueprintdrafter` and `blueprint-draft` (unclaimed), while `drafter` and `bpd` belong to unrelated maintainers. The owner claims `blueprint-drafter` before any document, Skill or MCP example that names it is published (architecture section 20).
 
 ## Security considerations

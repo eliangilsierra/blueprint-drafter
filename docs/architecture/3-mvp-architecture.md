@@ -731,7 +731,7 @@ and truncated per §7.4):
 
 ```text
 $ blueprint-drafter apply ride.bpd '~node trps "Trips"' '~edge pricing>maps to=geo label="cached ETA"' '-node notfy'
-REJECTED E_UNKNOWN_ID op#1 "~node trps \"Trips\"": no node "trps" | fix: did you mean "trips"?
+REJECTED E_UNKNOWN_ID op#1 "~node trps": no node "trps" | fix: did you mean "trips"?
 REJECTED E_UNKNOWN_ID op#3 "-node notfy": no node "notfy" | fix: did you mean "notify"?
 no changes written
 ```
@@ -746,7 +746,8 @@ info findings unless `--max` leaves room. The catalogue is a closed list in v1 (
 added; see the contract scope in §7.1).
 
 Untrusted text in messages: a message quotes at most the offending
-token, id or operation, never a whole file line; every such fragment is written with the string
+token, id or operation, never a whole file line; an operation is quoted by its keyword and reference
+only (for example `"~node trps"`), without its label or attributes; every such fragment is written with the string
 escapes of §7.2, stripped of control, bidirectional and zero-width characters, and truncated to 80
 characters with an ellipsis. Labels and descriptions are never echoed in messages.
 
@@ -926,9 +927,12 @@ the package and names its version), or the MCP tools. No scripts are bundled: th
 package. Client-specific files (hooks, MCP configuration examples) are optional examples next to it
 and also pin the version.
 
-Every example in the repository documentation, the Skill and the MCP configuration examples uses
-`blueprint-drafter@<exact version>` with `npx`; a documentation check fails on an `npx blueprint-drafter`
-line without `@<version>`. The npm name must be claimed by the owner before any of these documents is
+Every **instruction document** (the README and guides under `docs/`, the Skill, the CI action and its
+README, and the MCP configuration examples) uses `blueprint-drafter@<exact version>` with `npx`; a
+documentation check fails on an `npx blueprint-drafter` line without `@<version>` in those files.
+The check excludes `docs/decisions/` (the Decision text of an Accepted ADR is frozen and shows the
+command shape only; ADR-0006 and ADR-0007 point to the pinned form), `docs/architecture/` (design
+documents that describe the check itself) and `docs/research/` (archived evidence). The npm name must be claimed by the owner before any of these documents is
 published (§20, WP-1).
 
 ### 7.8 CI check
@@ -944,6 +948,8 @@ tag or a commit SHA. Inputs:
 
 Steps: `actions/setup-node` pinned to a commit SHA with the current Node.js LTS; then
 `npx --yes blueprint-drafter@"$VERSION" check --workspace "$GITHUB_WORKSPACE" --profile "$PROFILE" -- $PATHS`
+(`$PATHS` is deliberately unquoted so that the input is split on whitespace into several paths; glob
+expansion is disabled with `set -f`, and paths that contain spaces are not supported through this input)
 with `npm_config_ignore_scripts=true`. Inputs reach the shell only through `env:` variables, never
 through `${{ inputs.* }}` inside `run:`. The job fails on exit code 1 or 2; the log lists every
 error-level finding (AC-33). The action's README warns against combining it with
@@ -962,7 +968,7 @@ Every acceptance criterion maps to an automated test or a named manual check:
 | Golden files | SHA-256 of SVG and exports per case; 3 runs identical | AC-37 |
 | Output safety set | Labels with `<`, `&`, quotes, script text, an `<img onerror=...>` string and the Mermaid escape set in SVG, draw.io, Excalidraw, Mermaid and JSON; bidirectional and zero-width characters rejected; messages quote only truncated fragments | AC-24, AC-43 |
 | File-access tests | Symbolic link to a file outside the workspace, link loop, FIFO, hard-linked target, swap after check, Windows stream syntax; directory walk skips links | AC-31 |
-| Supply-chain checks | Install-script allow-list, `npm audit --omit=dev`, `npm audit signatures`, shrinkwrap in `npm pack`, font files listed by `npm pack --dry-run`, no `npx blueprint-drafter` example without an exact version | AC-46 |
+| Supply-chain checks | Install-script allow-list, `npm audit --omit=dev`, `npm audit signatures`, shrinkwrap in `npm pack`, font files listed by `npm pack --dry-run`, no `npx blueprint-drafter` line without an exact version in instruction documents (scope in §7.7; ADRs, design documents and the research archive excluded) | AC-46 |
 | Export tests | PNG size equals the viewBox; draw.io and Excalidraw parsed headless with their official libraries (dev dependencies) | AC-25, AC-27, AC-28 |
 | CLI contract tests | Text and JSON parity, exit codes, missing file | AC-29 |
 | MCP contract test | Recorded session with the official SDK client; workspace refusal; token budget | AC-30, AC-31, AC-41 |
