@@ -3,7 +3,7 @@
 This document lists every diagnostic code that Blueprint Drafter reports, with its severity, the
 condition that triggers it and the fix it suggests, and describes the text and JSON forms of a finding.
 The text format and the operation language that produce most of these codes are in
-[Text format and operation language](format.md).
+[The .bpd text format and operation language](format.md).
 
 Source of truth: the [architecture document](../architecture/3-mvp-architecture.md), §7.4 (cited as
 "architecture §n" below), with §6.3, §6.4, §7.1 and §7.5. If this document and the architecture
@@ -19,6 +19,7 @@ disagree, the architecture wins and the difference is a defect of this document.
 - [Geometric, legibility and composition](#geometric-legibility-and-composition)
 - [Exit codes](#exit-codes)
 - [Compatibility](#compatibility)
+- [Open points](#open-points)
 
 ## Reading a finding
 
@@ -44,6 +45,13 @@ check: <n>E <n>W <n>I · nodes=<n> edges=<n> crossings=<n> size=<w>x<h> profile=
 The text form omits info findings unless `--max` leaves room. The CLI prints at most `--max` lines, by
 default 20 (architecture §7.5). Operation failures are printed as `REJECTED <CODE> op#<n> ...` lines
 (see the [rejection example](format.md#rejection-example)).
+
+The architecture gives these line shapes by pattern and example only. It does not say how several ids
+are separated in `<ids>`, and the full shape of a `REJECTED` line is given only by the rejection
+example. Architecture §7.4 says the text form omits info findings unless `--max` leaves room;
+architecture §7.5 describes the text output as the summary line plus non-info findings. The two
+wordings are not reconciled. Line shapes are frozen within v1 ([Compatibility](#compatibility)), so
+these points are open (see [Open points](#open-points)).
 
 ### JSON form
 
@@ -97,6 +105,12 @@ Architecture §7.4. A message that mentions untrusted text follows these rules:
   ellipsis.
 - Labels and descriptions are never echoed in messages.
 
+The rule names tokens, ids and operations. It does not say whether it also applies to file paths,
+which appear in the `path` of the file codes below, in the per-file `check` output and in the JSON
+`file` field, and which come from directory discovery and from caller arguments. This reference does
+not claim that paths are escaped, stripped or truncated; the point is open (see
+[Open points](#open-points)).
+
 ## Syntax, operations, files and limits
 
 When one of these occurs in a command, the command does not complete its normal output. Nothing is
@@ -110,13 +124,13 @@ and returns status `failed`; see [Batch rules](format.md#batch-rules)). Architec
 | `E_VERSION_UNSUPPORTED` | error | Header version higher than supported | line | Upgrade the tool | — |
 | `E_UNKNOWN_STATEMENT` | error | Unknown keyword | line | List of keywords | — |
 | `E_UNKNOWN_ATTR` | error | Attribute key not allowed for the statement (including geometry or style keys) | line, element id | Closest key, or `meta.<key>` | AC-7 |
-| `E_BAD_VALUE` | error | Value outside the closed sets of `type`, header `dir`, `theme`, `density`, edge `style` or edge `dir`; empty required value (kinds are never `E_BAD_VALUE`, §6.3) | line, element id | Valid values | — |
+| `E_BAD_VALUE` | error | Value outside the closed sets of `type`, header `dir`, `theme`, `density`, edge `style` or edge `dir`; empty required value (kinds are never `E_BAD_VALUE`, architecture §6.3) | line, element id | Valid values | — |
 | `E_INVALID_OP` | error | Operation without `+`, `~` or `-`, or not allowed (for example `+diagram`) | op index | Correct form | — |
 | `E_UNKNOWN_ID` | error | `~` or `-` on an id that does not exist | op index, id | Closest id or `+node` | — |
 | `E_DUPLICATE_ID` | error | `+` with an existing id; duplicate id in a file | op index or line, id | `~node <id> ...` | — |
 | `E_UNKNOWN_CONSTRAINT` | error | `-rank same` or `-order` that matches no constraint | op index | Existing constraints | — |
 | `E_BATCH_INTRODUCES_ERRORS` | error | The batch would add semantic errors | introduced diagnostics | Per introduced diagnostic | — |
-| `E_LIMIT_EXCEEDED` | error | A limit of §9 exceeded (bytes, line length, elements, label length, id length, depth, ops, ops bytes, files, PNG pixels) | limit name, value, maximum | Split the diagram into views | — |
+| `E_LIMIT_EXCEEDED` | error | A limit of architecture §9 exceeded (bytes, line length, elements, label length, id length, depth, ops, ops bytes, files, PNG pixels) | limit name, value, maximum | Split the diagram into views | — |
 | `E_LAYOUT_TIMEOUT` | error | Layout and validation exceeded the time budget or the worker heap limit | — | Split the diagram into views | — |
 | `E_UNKNOWN_PROFILE` | error | Profile name not in `doc`, `slide`, `print` | — | Valid names | AC-22 |
 | `E_FILE_NOT_FOUND` | error | Input file missing or unreadable | path | — | — |
@@ -140,6 +154,14 @@ Notes:
   [Operation language](format.md#operation-language)).
 - An explicit path is not skipped by the name rules of directory discovery, but it must be a regular
   file, otherwise `E_NOT_REGULAR_FILE` (architecture §7.5).
+- `E_LIMIT_EXCEEDED` names the limit that was exceeded. The limits behind the listed items are
+  `maxFileBytes` (bytes), `maxLineChars` (line length), `maxElements` (elements), `maxLabelChars`
+  (label length), `maxIdChars` (id length), `maxGroupDepth` (depth), `maxOpsPerBatch` (ops),
+  `maxOpsBytes` (ops bytes), `maxFiles` (files) and `maxPngPixels` (PNG pixels), architecture §9.
+  The default values are provisional (architecture §20, Q-4) and are not stated here. Which of
+  `E_BAD_ID` and `E_LIMIT_EXCEEDED` applies to an id longer than `maxIdChars` is open (see
+  [Open points](#open-points)). `E_LAYOUT_TIMEOUT` covers the time budget `layoutTimeoutMs` and the
+  heap ceiling `layoutWorkerHeapMb`.
 - The architecture assigns acceptance criteria to individual codes only in the geometric table and
   for `E_UNKNOWN_ATTR` (AC-7) and `E_UNKNOWN_PROFILE` (AC-22). The column shows "—" where it assigns
   none.
@@ -159,7 +181,7 @@ Findings on the model, before any layout. Architecture §7.4.
 | `E_CONSTRAINT_CONFLICT` | error | One id in two `rank same` constraints, or contradictory `order` | Remove one | — |
 | `E_UNSUPPORTED_FOR_TYPE` | error | Construct not allowed for the diagram type (groups or constraints in `sequence`) | Remove it or change `type` | — |
 | `W_UNKNOWN_KIND` | warning | Kind not in the closed set | Closest kind | — |
-| `W_NOT_FOR_TYPE` | warning | Kind, group kind, edge style or edge `dir` not admissible for the diagram type (§6.3) | Closest admissible value or `~diagram type=...` | — |
+| `W_NOT_FOR_TYPE` | warning | Kind, group kind, edge style or edge `dir` not admissible for the diagram type (architecture §6.3) | Closest admissible value or `~diagram type=...` | — |
 | `W_UNLABELED_RELATION` | warning | C4 relation without a label | `~edge <ref> "label"` | — |
 | `W_C4_PERSON_IN_BOUNDARY` | warning | A person inside a system boundary | Move it out | — |
 | `W_C4_LEVEL_MIX` | warning | Components mixed with containers of another system | Split views | — |
@@ -183,7 +205,7 @@ views).
 | `E_EDGE_UNROUTED` | error | The engine returned no route for an edge | — | — |
 | `E_LABEL_OVERLAPS_NODE` | error | A label over a leaf node or over the title of an unrelated group | — | AC-20 |
 | `E_LABEL_OVERLAPS_LABEL` | error | Two labels overlap | — | — |
-| `E_LABEL_OVERLAPS_EDGE` | error | A label is crossed by a connector other than its own (FR-15) | The label's own connector | AC-20 (node case only; see §20) |
+| `E_LABEL_OVERLAPS_EDGE` | error | A label is crossed by a connector other than its own (FR-15) | The label's own connector | AC-20 (node case only; see architecture §20) |
 | `W_NODES_TOO_CLOSE` | warning | Gap under 12 px between leaves | — | — |
 | `W_TEXT_TRUNCATED` | warning | Text was elided | — | AC-9 |
 | `W_EDGE_THROUGH_GROUP` | warning | Edge crosses a group containing neither end | Ancestor groups of an end | AC-18 |
@@ -240,6 +262,29 @@ Not frozen within v1: threshold values, profile canvases, limit defaults, messag
 severity of heuristic `W_` and `I_` codes, which calibration (question Q-5) may change in a minor
 release.
 
+The "message wording" latitude concerns the words of a message. The content rule of the
+[Message quoting rule](#message-quoting-rule) (what a message may contain) is a security property; the
+architecture does not say explicitly that it is outside that latitude (open, see
+[Open points](#open-points)).
+
 v1 only adds: new optional fields, new functions and new codes. Removing or changing a field or a code
-needs a major version. See the same section in [Text format and operation
+needs a major version. See the same section in [The .bpd text format and operation
 language](format.md#compatibility).
+
+## Open points
+
+These points are not specified by the architecture. This reference does not decide them; they are open
+questions for the Architect on [#56](https://github.com/eliangilsierra/blueprint-drafter/issues/56),
+and this document follows the architecture once it decides.
+
+| Point | Where it matters | Open question |
+| --- | --- | --- |
+| Separator of several ids in a text line | [Text form](#text-form) | Not stated |
+| Full shape of the `REJECTED` line | [Text form](#text-form) | Only the example gives it |
+| Info findings in the text form | [Text form](#text-form) | Architecture §7.4 and §7.5 are worded differently |
+| File paths in messages and in the JSON `file` field | [Message quoting rule](#message-quoting-rule) | Whether the quoting rule applies |
+| An id longer than 64 characters | [Syntax, operations, files and limits](#syntax-operations-files-and-limits) | `E_BAD_ID` or `E_LIMIT_EXCEEDED` |
+| The quoting rule against "message wording" | [Compatibility](#compatibility) | Whether it is outside the unfrozen latitude |
+
+The open points of the format reference (defaults, clearing, `tags`, rejected characters) are listed in
+[The .bpd text format and operation language](format.md#open-points).

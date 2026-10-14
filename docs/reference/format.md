@@ -37,8 +37,8 @@ One statement per line. Architecture §7.2.
 - Line endings: LF or CRLF on input; LF on output, with a final newline.
 - The first statement is the header. A file whose first statement is not the header fails with
   `E_MISSING_HEADER`.
-- After the header come comment lines, blank lines and the statements `group`, `node`, `edge`, `rank
-  same` and `order`.
+- After the header come comment lines, blank lines and the statements `group`, `node`, `edge`,
+  `rank same` and `order`.
 - A statement keyword that is not one of these fails with `E_UNKNOWN_STATEMENT`.
 
 Grammar (EBNF, architecture §7.2):
@@ -79,9 +79,25 @@ diagram 1 type=c4-container dir=TB title="Container diagram for Internet Banking
 | `density=` | `compact`, `normal` or `airy` |
 | `title=` | The diagram title, a word or a quoted string |
 
-The default direction depends on the type (architecture §6.3): `TB` for `flow`, `c4-context` and
-`c4-container`; `LR` for `component` and `architecture`. A header value outside the closed set of
-`type`, `dir`, `theme` or `density` fails with `E_BAD_VALUE`.
+A header value outside the closed set of `type`, `dir`, `theme` or `density` fails with
+`E_BAD_VALUE`.
+
+### Defaults
+
+The architecture states these defaults:
+
+- Header `dir` (architecture §6.3): `TB` for `flow`, `c4-context` and `c4-container`; `LR` for
+  `component` and `architecture`.
+- Edge `style` is `sync` and edge `dir` is `fwd` (architecture §7.2, closed value sets).
+
+The canonical serialisation omits defaults ([Canonical serialisation](#canonical-serialisation)).
+The architecture does not state the following, so this reference does not either (open, see
+[Open points](#open-points) and [#56](https://github.com/eliangilsierra/blueprint-drafter/issues/56)):
+
+- The default `dir` of a `sequence` diagram, and therefore whether the canonical form writes or drops
+  a `dir=` there.
+- The defaults of `theme` and `density`.
+- Whether an edge with `style=sync` or `dir=fwd` is written or omitted by the serialiser.
 
 ## Statements and attributes
 
@@ -93,12 +109,30 @@ The default direction depends on the type (architecture §6.3): `TB` for `flow`,
 | Same rank | `rank same <id>,<id>{,<id>}` | none |
 | Order | `order <id>,<id>{,<id>}` | none |
 
+The architecture defines the meaning of these attributes only as follows:
+
+| Attribute | Meaning |
+| --- | --- |
+| `in` | The containing group (see the rules below) |
+| `tech` | The technology of the element; on C4 diagrams it is shown as `[Container: tech]` (architecture §6.3) |
+| `desc` | The description of the element; wrapped to at most 4 lines and elided beyond that (architecture §6.5) |
+| `id` | The explicit id of an edge, kept across reconnections ([Ids and edge ids](#ids-and-edge-ids)) |
+| `style`, `dir` | The edge style and the edge direction ([Closed value sets](#closed-value-sets)) |
+| `meta.<key>` | Opaque user metadata |
+| `tags` | Not defined. The grammar admits a word or a quoted string, and the architecture does not specify the value form (open, see [Open points](#open-points)) |
+
 - The label of a group, node or edge is **positional**: a quoted string after the kind (or after the
   edge reference). `label=` is not an attribute; in a file line it fails with `E_UNKNOWN_ATTR` and the
   fix "the label is positional".
 - `in=<group-id>` places the element in a group. It must name a group, containment cannot form a
-  cycle, and nesting depth is limited (architecture §7.2, Containment).
-- An edge may connect nodes or groups.
+  cycle, and nesting depth is limited (architecture §7.2, Containment). The diagnostics are
+  `E_UNKNOWN_PARENT` (`in=` names no element), `E_PARENT_NOT_GROUP` (it names a node),
+  `E_CONTAINMENT_CYCLE`, and `E_LIMIT_EXCEEDED` for the depth limit `maxGroupDepth`.
+- An edge may connect nodes or groups. An endpoint that does not exist is `E_DANGLING_EDGE`.
+- A constraint (`rank same`, `order`) names two or more ids. An unknown id is
+  `E_CONSTRAINT_UNKNOWN_ID`; one id in two `rank same` constraints, or contradictory `order`
+  constraints, is `E_CONSTRAINT_CONFLICT`. Constraints are not allowed in a `sequence` diagram
+  (`E_UNSUPPORTED_FOR_TYPE`).
 - `meta.<key>` attributes are opaque user metadata: they are preserved, serialised sorted by key, and
   never used for layout or rendering.
 - An attribute key that is not in the list of its statement and does not start with `meta.` fails
@@ -146,10 +180,10 @@ Violation policy (architecture §6.3):
 Architecture §7.2, Rules.
 
 - **Ids** are case-sensitive and unique across groups, nodes and edges. The engine never changes an
-  id chosen by the author. An id matches the `ID` token of the grammar, which allows at most 64
-  characters (the limit `maxIdChars`, architecture §9). An id that does not match the id pattern is
-  `E_BAD_ID`; a duplicate id is `E_DUPLICATE_ID`; an id longer than the limit is reported as
-  `E_LIMIT_EXCEEDED` when the limit check runs.
+  id chosen by the author. An id has at most 64 characters (the comment on the `ID` token in the
+  grammar; the limit is `maxIdChars`, architecture §9). An id that does not match the id pattern is
+  `E_BAD_ID`; a duplicate id is `E_DUPLICATE_ID`. Which code an id of 65 or more characters gets,
+  `E_BAD_ID` or `E_LIMIT_EXCEEDED`, is not yet specified (open, see [Open points](#open-points)).
 - **Edge ids are stable once assigned.** An edge has either an explicit id (`id=x`, kept across
   reconnections) or a derived id of the form `from>to` or `from>to#n`, with n >= 2.
 - The derived id is assigned **once**, when the edge is added: `+edge a>b` takes `a>b` if it is free,
@@ -199,6 +233,12 @@ The following are rejected with `E_SYNTAX` and a specific message (architecture 
 | Noncharacters | Unicode noncharacters |
 | Unpaired surrogates | Unpaired UTF-16 surrogates |
 
+The architecture states this rule under "Strings". It does not say whether the rejection also applies
+to comment lines, bare words, `meta.*` values and the text of a whole file or operation, and it does
+not list the characters the control-character rule exempts. The grammar itself accepts LF and CRLF as
+line endings and a tab in the leading whitespace of a comment line. This reference does not decide
+those points; they are open (see [Open points](#open-points)).
+
 ## No coordinates, sizes or colours
 
 The format has no geometry or style input (requirements #1, FR-6 and assumption A-9). Positions, sizes
@@ -218,7 +258,7 @@ The serialiser writes one canonical text for a model (architecture §7.2, Canoni
 FR-8, AC-10).
 
 1. The header, with attributes in the order `type`, `dir`, `theme`, `density`, `title`, omitting
-   defaults.
+   defaults (which values are defaults: see [Defaults](#defaults); several are not specified).
 2. Groups from outer to inner, siblings in model order.
 3. Nodes in model order.
 4. Edges in model order.
@@ -302,45 +342,54 @@ remove        = "-" , ( [ "node" | "group" | "edge" ] , ( EDGE-REF | ID )
   that an empty value (`key=`) clears an optional attribute, but the grammar (`value = WORD | STRING`
   in §7.2) admits no empty value, so such a line is not a valid operation and this reference gives no
   example of it. The question is tracked in
-  [#56](https://github.com/eliangilsierra/blueprint-drafter/issues/56). Clearing `kind` or `label`
-  is `E_BAD_VALUE` in any case.
+  [#56](https://github.com/eliangilsierra/blueprint-drafter/issues/56). The architecture also says
+  that clearing `kind` or `label` is `E_BAD_VALUE` (§7.3); whether this holds for an edge label, which
+  is optional in the grammar, is open (see [Open points](#open-points)).
 - An edge update and a removal accept an explicit edge id as a bare `ID`.
 - **Remove** (`-`) removes the element. Removing a node removes its edges and its ids from
   constraints; a constraint left with fewer than two ids is dropped. Removing a group re-parents its
   children to the parent of the group. Other edges keep their ids.
+- Add appends the element or constraint in model order, and a new edge gets its id as described in
+  [Ids and edge ids](#ids-and-edge-ids). The canonical order depends on model order.
+- How `-edge` is read when an element has the id `edge` (the keyword form `-edge <ref>` against the
+  bare form `-<id>`) is not specified (open, see [Open points](#open-points)).
 
-| Operation | Form | Failure codes |
-| --- | --- | --- |
-| Add | `+group ...`, `+node ...`, `+edge ...`, `+rank same ...`, `+order ...` | `E_DUPLICATE_ID` (fix: `~node id ...`), syntax codes |
-| Update | `~node ID [KIND] ["Label"] {attr}`, `~group ID [KIND] ["Label"] {attr}`, `~edge REF ["label"] {attr} [from=ID] [to=ID]`, `~diagram {header-attr}` | `E_UNKNOWN_ID` (fix: closest id or `+node`), `E_BAD_VALUE`, `E_UNKNOWN_ATTR` |
-| Remove | `-node ID`, `-group ID`, `-edge REF`, `-ID`, `-rank same ID,...`, `-order ID,...` | `E_UNKNOWN_ID`, `E_UNKNOWN_CONSTRAINT` |
+| Operation | Form | Effect | Failure codes |
+| --- | --- | --- | --- |
+| Add | `+group ...`, `+node ...`, `+edge ...`, `+rank same ...`, `+order ...` | Appends the element or constraint in model order; a new edge gets its id per [Ids and edge ids](#ids-and-edge-ids) | `E_DUPLICATE_ID` (fix: `~node id ...`), syntax codes |
+| Update | `~node ID [KIND] ["Label"] {attr}`, `~group ID [KIND] ["Label"] {attr}`, `~edge REF ["label"] {attr} [from=ID] [to=ID]`, `~diagram {header-attr}` | Changes only the given fields; a reconnection gives an edge with a derived id a new derived id, an explicit id is kept | `E_UNKNOWN_ID` (fix: closest id or `+node`), `E_BAD_VALUE`, `E_UNKNOWN_ATTR` |
+| Remove | `-node ID`, `-group ID`, `-edge REF`, `-ID`, `-rank same ID,...`, `-order ID,...` | Removes the element; removing a node removes its edges and its ids from constraints (constraints left with fewer than two ids are dropped); removing a group re-parents its children to the group's parent; other edges keep their ids | `E_UNKNOWN_ID`, `E_UNKNOWN_CONSTRAINT` |
 
 An operation without a prefix, or one that is not allowed, fails with `E_INVALID_OP`.
 
 ### Examples
 
-Valid operations against the worked example above. Each line is an independent example, not a
-sequence; the `pricing>maps` line assumes a diagram with an edge `pricing>maps` and a node `geo`, as in the
-[rejection example](#rejection-example):
+Valid operations against the worked example above. Each line is an independent example: apply it to
+the worked example as written, not to the result of another line.
 
 ```text
 +node cache cache "Session Cache" in=platform
-+edge api>cache "Reads sessions" tech=Redis
-+rank same api,cache
++edge api>mail "Sends digests" style=async
++rank same db,mail
++order customer,web,api
 ~node api "Order Service"
 ~node api service "Order Service"
 ~node api kind=gateway label="Order Gateway"
 ~edge api>db "Reads and writes orders"
 ~edge api>mail "Sends invoices"
-~edge pricing>maps to=geo label="cached ETA"
+~edge customer>web to=api label="Places orders"
 ~edge api>mail#2 style=dep to=push
 ~diagram theme=dark dir=LR
--node cache
+-node push
 -group platform
 -edge api>db
 -api>mail#2
--rank same api,cache
+-rank same web,api
 ```
+
+For example, `+edge api>mail "Sends digests" style=async` takes the id `api>mail#3`, because `api>mail`
+and `api>mail#2` are in use, and `~edge api>mail#2 style=dep to=push` gives that edge the derived id
+`api>push#2`, reported as `(was api>mail#2)`.
 
 Invalid:
 
@@ -391,6 +440,26 @@ The CLI exits with code 3 when a batch is rejected (architecture §7.5). The exa
 repository use the pinned form `npx --yes blueprint-drafter@<x.y.z> ...` (architecture §7.7); replace
 `<x.y.z>` with the exact released version.
 
+## Open points
+
+These points are not specified by the architecture. This reference does not decide them; they are open
+questions for the Architect on [#56](https://github.com/eliangilsierra/blueprint-drafter/issues/56),
+and this document follows the architecture once it decides.
+
+| Point | Where it matters | Open question |
+| --- | --- | --- |
+| Which code an id of 65 or more characters gets | [Ids and edge ids](#ids-and-edge-ids) | `E_BAD_ID` or `E_LIMIT_EXCEEDED` |
+| Defaults of `sequence` header `dir`, `theme` and `density`, and of edge `style=sync` and `dir=fwd` in the canonical form | [Defaults](#defaults) | Which values the serialiser omits |
+| How to clear an optional attribute | [Rules](#rules) | The `key=` form is not in the grammar |
+| Clearing an edge label | [Rules](#rules) | Whether `E_BAD_VALUE` applies when the label is optional |
+| `-edge` against an element with the id `edge` | [Rules](#rules) | How the operation is read |
+| The value form of `tags` | [Statements and attributes](#statements-and-attributes) | What `tags` holds |
+| Scope of the rejected-character rule | [Strings, escapes and rejected characters](#strings-escapes-and-rejected-characters) | Comments, bare words, `meta.*` values, exempt characters |
+| The quoting rule against "message wording" | [Compatibility](#compatibility) | Whether the quoting rule is outside the unfrozen latitude |
+
+The open points of the diagnostics reference (text form shapes, paths in messages) are listed in
+[Diagnostic catalogue](diagnostics.md#open-points).
+
 ## Versioning
 
 - The header carries the format version: `diagram 1 ...`. A header version higher than the supported
@@ -409,6 +478,11 @@ of the syntax, operation, file, limit and semantic classes plus the error-level 
 
 Not frozen within v1: threshold values, profile canvases, limit defaults, message wording, and the
 severity of heuristic `W_` and `I_` codes, which calibration may change in a minor release.
+
+The "message wording" latitude concerns the words of a message. The content rule of the [message quoting
+rule](diagnostics.md#message-quoting-rule) (what a message may contain) is a security property; the
+architecture does not say explicitly that it is outside that latitude (open, see
+[Open points](#open-points)).
 
 v1 only adds: new optional fields, new functions and new codes. Removing or changing a field or a code
 needs a major version. See the same section in [Diagnostic catalogue](diagnostics.md#compatibility).
