@@ -1,0 +1,88 @@
+name: Research request
+description: Ask a question that blocks a decision. The Researcher agent answers with a classified, sourced report.
+title: "[Research]: "
+labels: ["agent:research"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The Researcher answers using `templates/research.md`: every statement is classified as
+        FACT, EVIDENCE, ASSUMPTION, INTERPRETATION or RECOMMENDATION, and every source is cited.
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Research question
+      description: The precise question to answer.
+      placeholder: "Which JWT validation library should the API service use for EdDSA-signed tokens?"
+    validations:
+      required: true
+
+  - type: textarea
+    id: decision
+    attributes:
+      label: Decision supported
+      description: What decision will be made with the answer, and by whom.
+      placeholder: "Architect chooses the token validation library for ADR-0008."
+    validations:
+      required: true
+
+  - type: input
+    id: parent
+    attributes:
+      label: Related Issue
+      description: The feature or architecture Issue that needs this research.
+      placeholder: "#120"
+    validations:
+      required: false
+
+  - type: textarea
+    id: options
+    attributes:
+      label: Known options
+      description: Alternatives already on the table, including keeping the current approach.
+    validations:
+      required: false
+
+  - type: textarea
+    id: criteria
+    attributes:
+      label: Evaluation criteria
+      description: What matters, ideally with weights (high / medium / low).
+      placeholder: |
+        - Supports EdDSA (high)
+        - Actively maintained, no open critical advisories (high)
+        - Permissive licence (medium)
+    validations:
+      required: true
+
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints
+      description: Versions, runtime, licences, hosting, budget.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: timebox
+    attributes:
+      label: Time box
+      options:
+        - 1 hour
+        - 4 hours
+        - 1 day
+        - 2 days
+    validations:
+      required: true
+
+  - type: dropdown
+    id: requested-by
+    attributes:
+      label: Requested by
+      options:
+        - Product Manager
+        - Architect
+        - Human
+    validations:
+      required: true

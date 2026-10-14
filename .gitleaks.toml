@@ -1,0 +1,13 @@
+# gitleaks configuration (Issue #15): the default rules plus documented placeholders.
+# The team's own policy is config/secret-patterns.tsv; gitleaks adds a second, independent rule set in CI.
+# Never allowlist a path or a finding to make CI green: remove the value and rotate the credential.
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Documented placeholders such as <token>, ${TOKEN} and {{ secrets.TOKEN }}"
+regexes = [
+  '''^<[^>]+>$''',
+  '''^\$\{\{?[^}]+\}?\}$''',
+]

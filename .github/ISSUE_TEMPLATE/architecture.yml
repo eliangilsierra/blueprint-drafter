@@ -1,0 +1,80 @@
+name: Architecture request
+description: Request a design or an architecture decision. The Architect agent produces an architecture document and ADRs.
+title: "[Architecture]: "
+labels: ["agent:architect"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The Architect answers with `templates/architecture.md` and, for hard-to-reverse decisions,
+        ADRs from `templates/adr.md` in status Proposed. A human accepts each ADR.
+
+  - type: input
+    id: requirements
+    attributes:
+      label: Requirements Issue
+      description: Feature Issue containing the requirements and acceptance criteria, if any.
+      placeholder: "#120"
+    validations:
+      required: false
+
+  - type: textarea
+    id: decision
+    attributes:
+      label: Decision or design needed
+      description: What must be designed or decided.
+      placeholder: "Where to store login throttling state and how it expires."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Type of change
+      multiple: true
+      options:
+        - New component or service
+        - New or changed public API
+        - Data model or migration
+        - Trust boundary or authentication/authorization model
+        - New infrastructure or external service
+        - Deviation from an existing ADR or convention
+        - Architectural review of existing code
+    validations:
+      required: true
+
+  - type: textarea
+    id: drivers
+    attributes:
+      label: Architecturally significant requirements
+      description: Requirements and non-functional requirements (FR/NFR IDs or text) that drive the design.
+      placeholder: |
+        - NFR-1: blocked accounts unblock automatically after 15 minutes
+        - p95 login latency stays below 300 ms
+    validations:
+      required: true
+
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints
+      description: Hosting, budget, existing technologies, compliance, team skills, with their source.
+      placeholder: "Must run on the existing Coolify host; no new paid services (ADR-0001)."
+    validations:
+      required: false
+
+  - type: textarea
+    id: options
+    attributes:
+      label: Known options
+      description: Options already considered, including the simplest one.
+    validations:
+      required: false
+
+  - type: textarea
+    id: related-adrs
+    attributes:
+      label: Related ADRs
+      description: Existing ADRs that constrain or may be superseded by this decision.
+    validations:
+      required: false

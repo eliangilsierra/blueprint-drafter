@@ -1,0 +1,94 @@
+name: Bug report
+description: Report a defect. The QA Engineer agent reproduces it before it is planned.
+title: "[Bug]: "
+labels: ["agent:qa"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Security vulnerabilities must not be reported here.** Follow `SECURITY.md` instead.
+        Do not paste secrets, tokens, credentials or personal data in logs or screenshots.
+
+  - type: checkboxes
+    id: not-security
+    attributes:
+      label: Confirmation
+      options:
+        - label: This is not a security vulnerability, and this report contains no secrets or personal data.
+          required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: One or two sentences describing the defect.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Minimal, numbered steps that someone else can follow.
+      placeholder: |
+        1. Log in as a user with role "agent"
+        2. Open ticket #123
+        3. Click "Show order"
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+      description: What should happen, and where that expectation comes from (requirement, documentation, previous version).
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+      description: What happens instead, including error messages.
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version / commit / environment
+      description: Application version or commit SHA, environment (local, staging, production), browser or OS.
+      placeholder: "v2.4.1 (a1b2c3d), staging, Firefox 131"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: frequency
+    attributes:
+      label: Frequency
+      options:
+        - Always
+        - Intermittent
+        - Happened once
+    validations:
+      required: true
+
+  - type: dropdown
+    id: impact
+    attributes:
+      label: User impact
+      options:
+        - Blocks users from completing a task
+        - Degrades a workflow (workaround exists)
+        - Cosmetic or minor
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or output
+      description: Relevant, redacted excerpts only. This field is rendered as code.
+      render: shell
+    validations:
+      required: false

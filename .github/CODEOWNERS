@@ -1,0 +1,4 @@
+# Code owners must be HUMANS. Never list an agent bot account or GitHub App here:
+# branch protection requires a code-owner approval, and that approval is the human merge decision.
+
+* @eliangilsierra

@@ -1,0 +1,67 @@
+{
+  "name": "blueprint-drafter",
+  "version": "0.1.0",
+  "description": "Semantic diagram engine for AI coding agents: a text format, incremental operations, automatic layout and machine-checkable diagnostics.",
+  "keywords": [
+    "diagram",
+    "architecture",
+    "c4",
+    "mcp",
+    "cli",
+    "ai-agents"
+  ],
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/eliangilsierra/blueprint-drafter.git"
+  },
+  "bugs": {
+    "url": "https://github.com/eliangilsierra/blueprint-drafter/issues"
+  },
+  "homepage": "https://github.com/eliangilsierra/blueprint-drafter#readme",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "bin": {
+    "blueprint-drafter": "dist/cli/index.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/core/index.d.ts",
+      "import": "./dist/core/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "fonts",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "scripts": {
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
+    "clean:test": "node -e \"require('node:fs').rmSync('dist-test',{recursive:true,force:true})\"",
+    "prebuild": "npm run clean",
+    "build": "tsc -p tsconfig.build.json",
+    "prebuild:test": "npm run clean:test",
+    "build:test": "tsc -p tsconfig.test.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint .",
+    "pretest": "npm run build:test",
+    "test": "node --test \"dist-test/test/**/*.test.js\""
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "@resvg/resvg-js": "2.6.2",
+    "elkjs": "0.12.0",
+    "fontkit": "2.0.4",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "eslint": "10.12.0",
+    "js-tiktoken": "1.0.21",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.71.2"
+  }
+}
