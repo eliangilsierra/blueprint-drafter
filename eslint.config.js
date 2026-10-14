@@ -6,11 +6,12 @@ import { coreIsolation } from "./eslint.config.core.js";
 export default defineConfig(
   {
     name: "blueprint-drafter/ignores",
-    ignores: ["dist/**", "dist-test/**", "coverage/**", "node_modules/**"],
+    // docs/research/** is an archived prototype that no tsconfig includes: type-aware linting cannot parse it.
+    ignores: ["dist/**", "dist-test/**", "coverage/**", "node_modules/**", "docs/research/**"],
   },
   {
     name: "blueprint-drafter/typescript",
-    files: ["**/*.ts"],
+    files: ["**/*.{ts,mts,cts}"],
     extends: [tseslint.configs.strictTypeChecked],
     languageOptions: {
       parserOptions: {

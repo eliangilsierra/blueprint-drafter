@@ -13,8 +13,9 @@ ADR-0007).
   committed `package-lock.json`; ESLint 10 with typescript-eslint; tests with the built-in `node:test` runner. One package, one binary
   (`blueprint-drafter`), no bundler, no monorepo tool (ADR-0007).
 - Install: `npm ci`
-- Lint: `npm run lint` (ESLint, type-aware; `src/core/**` also forbids `eval`, `Function`, `vm`,
-  `child_process`, `net`, `http`, `https`, `dgram` and `fetch`: NFR-8)
+- Lint: `npm run lint` (ESLint, type-aware; `src/core/**` also forbids the modules and globals listed in
+  `eslint.config.core.js` (code evaluation, processes, network, computed module specifiers) and ignores inline
+  `eslint-disable` comments: NFR-8; `docs/research/**` is not linted)
 - Type check: `npm run typecheck` (`tsc --noEmit` over `src/`, `test/` and `bench/`)
 - Test: `npm test` (first compiles `src/` and `test/` with `tsc` into `dist-test/`, then runs
   `node --test` on the compiled `*.test.js` files; works on every Node.js 22 minor without
