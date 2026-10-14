@@ -298,8 +298,12 @@ remove        = "-" , ( [ "node" | "group" | "edge" ] , ( EDGE-REF | ID )
   fix "the label is positional". `kind=` does not exist on edges.
 - `from=` and `to=` exist only in edge updates and reconnect the edge (see [Ids and edge
   ids](#ids-and-edge-ids)).
-- An empty value (`key=`) clears an optional attribute. Clearing `kind` or `label` fails with
-  `E_BAD_VALUE`.
+- **How to clear an optional attribute is not yet specified.** The architecture prose (§7.3) says
+  that an empty value (`key=`) clears an optional attribute, but the grammar (`value = WORD | STRING`
+  in §7.2) admits no empty value, so such a line is not a valid operation and this reference gives no
+  example of it. The question is tracked in
+  [#56](https://github.com/eliangilsierra/blueprint-drafter/issues/56). Clearing `kind` or `label`
+  is `E_BAD_VALUE` in any case.
 - An edge update and a removal accept an explicit edge id as a bare `ID`.
 - **Remove** (`-`) removes the element. Removing a node removes its edges and its ids from
   constraints; a constraint left with fewer than two ids is dropped. Removing a group re-parents its
@@ -326,7 +330,6 @@ sequence; the `pricing>maps` line assumes a diagram with an edge `pricing>maps` 
 ~node api "Order Service"
 ~node api service "Order Service"
 ~node api kind=gateway label="Order Gateway"
-~node api desc=
 ~edge api>db "Reads and writes orders"
 ~edge api>mail "Sends invoices"
 ~edge pricing>maps to=geo label="cached ETA"
@@ -372,8 +375,9 @@ Architecture §7.3 (FR-10, AC-12). A batch is a list of operations applied toget
 
 ### Rejection example
 
-The product output for a diagram with a node `trips`, one valid and two invalid operations (benchmark
-case 4). Every failure is listed and nothing is written. Messages quote untrusted text under the
+The product output for a diagram with the nodes `trips`, `notify` and `geo` and an edge `pricing>maps`
+(operation 2 is valid only on such a diagram), one valid and two invalid operations
+(benchmark case 4). Every failure is listed and nothing is written. Messages quote untrusted text under the
 [quoting rule](diagnostics.md#message-quoting-rule).
 
 ```text
