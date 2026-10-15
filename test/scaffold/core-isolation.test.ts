@@ -1,11 +1,15 @@
 import assert from "node:assert/strict";
-import { join } from "node:path";
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { extname, join, relative, sep } from "node:path";
 import { test } from "node:test";
+import { pathToFileURL } from "node:url";
 
 import { ESLint } from "eslint";
 import tseslint from "typescript-eslint";
 
-import { isRecord, repositoryRoot } from "./helpers.js";
+import { isRecord, readJson, repositoryRoot } from "./helpers.js";
+import { COMPILED_EXTENSIONS, listFiles } from "./support/core-files.js";
 
 // These tests load the real eslint.config.js of the repository, so removing or narrowing the isolation block
 // (or the ignores) there makes them fail. Fixtures are linted as text at paths that do not exist on disk, which
@@ -207,6 +211,14 @@ const REJECTED: readonly Fixture[] = [
   { name: "module.require in a .cts file", code: 'export const load: unknown = module.require("child_process");\n', path: "src/core/fixture.cts", rule: CORE_GLOBALS },
   { name: "an alias of require in a .cts file", code: 'const load = require;\nexport const cp: unknown = load("node:child_process");\n', path: "src/core/fixture.cts", rule: CORE_GLOBALS },
   { name: "require.call in a .cts file", code: 'export const cp: unknown = require.call(null, "node:child_process");\n', path: "src/core/fixture.cts", rule: CORE_GLOBALS },
+  // QA-9 of PR #61: tsc compiles .tsx too, so every rule must reach it.
+  { name: "node:child_process in a .tsx file (QA-9 reproduction)", code: 'import { spawnSync } from "node:child_process";\n\nexport const evil = (): unknown => spawnSync("node", ["--version"]);\n', path: "src/core/evil.tsx", rule: CORE_IMPORTS },
+  { name: "node:child_process in a .tsx file (deny-list layer)", code: FORBIDDEN_IMPORT, path: "src/core/fixture.tsx", rule: "no-restricted-imports" },
+  { name: "an unlisted package in a .tsx file", code: importOf("cross-spawn"), path: "src/core/fixture.tsx", rule: CORE_IMPORTS },
+  { name: "an import of ../cli from a .tsx file", code: importOf("../cli/index.js"), path: "src/core/fixture.tsx", rule: CORE_IMPORTS },
+  { name: "an alias of process in a .tsx file", code: "const p = process;\nexport const x: unknown = p;\n", path: "src/core/fixture.tsx", rule: CORE_GLOBALS },
+  { name: "(() => {}).constructor in a .tsx file", code: "export const run = (): unknown => (() => undefined).constructor;\n", path: "src/core/fixture.tsx", rule: "no-restricted-syntax" },
+  { name: "node:fs in a .tsx file outside src/core/io", code: importOf("node:fs"), path: "src/core/text/fonts.tsx", rule: CORE_IMPORTS },
 ];
 
 for (const fixture of REJECTED) {
@@ -227,6 +239,8 @@ const ALLOWED: ReadonlyArray<Omit<Fixture, "rule">> = [
   { name: "a core-internal relative import at depth 1", code: importOf("../model/types.js"), path: "src/core/text/fixture.ts" },
   { name: "a core-internal relative import at depth 3", code: importOf("../../../model/types.js"), path: "src/core/layout/elk/steps/fixture.ts" },
   { name: "a core-internal import of the core entry point", code: importOf("../index.js"), path: "src/core/model/fixture.ts" },
+  { name: "a core-internal relative import in a .tsx file", code: importOf("../model/types.js"), path: "src/core/render/fixture.tsx" },
+  { name: "node:fs in a .tsx file of src/core/io (#34)", code: importOf("node:fs"), path: "src/core/io/read.tsx" },
   { name: "a core-internal re-export and dynamic import", code: 'export { a } from "./model/types.js";\nexport const load = () => import("./model/types.js");\n', path: CORE_FILE },
   { name: "the listed package fontkit", code: importOf("fontkit"), path: "src/core/text/fonts.ts" },
   { name: "a plain subpath of the listed package elkjs", code: importOf("elkjs/lib/elk.bundled.js"), path: "src/core/layout-elk/run.ts" },
@@ -325,4 +339,71 @@ test("the allow-list options for src/core are exactly the reviewed lists", async
   assert.deepEqual(options["nodeModules"], ["node:buffer", "node:crypto", "node:path", "node:perf_hooks", "node:url", "node:util"]);
   assert.deepEqual(options["packages"], ["fontkit", "elkjs", "@resvg/resvg-js"]);
   assert.equal(options["coreDirectory"], join(repositoryRoot, "src", "core"));
+});
+
+// O-3 of the QA report on PR #61: allowing another member of process (for example kill) must fail a test.
+test("the globals options for src/core are exactly the reviewed members (only process.platform)", async () => {
+  const config: unknown = await eslint.calculateConfigForFile(join(repositoryRoot, CORE_FILE));
+  const rules = isRecord(config) && isRecord(config["rules"]) ? config["rules"] : {};
+  const setting = rules[CORE_GLOBALS];
+  assert.ok(Array.isArray(setting), "the globals rule must be configured for src/core");
+  const options: unknown = setting[1];
+  assert.ok(isRecord(options));
+  assert.deepEqual(options["allowedMembers"], { process: ["platform"], globalThis: [], global: [], module: [] });
+});
+
+// QA-9 of PR #61: the rules must reach every file that tsc compiles from src/core, as a class, not one extension
+// at a time. tsc compiles .ts, .tsx, .mts and .cts (allowJs is off, checked below); the lint globs, the guard's
+// discovery and this list must agree, and any other file in src/core fails here.
+const coreConfig: unknown = await import(pathToFileURL(join(repositoryRoot, "eslint.config.core.js")).href);
+
+test("the lint extensions of src/core are exactly the extensions tsc compiles and the guard discovers", () => {
+  assert.ok(isRecord(coreConfig) && Array.isArray(coreConfig["CORE_SOURCE_EXTENSIONS"]));
+  const lintExtensions = coreConfig["CORE_SOURCE_EXTENSIONS"].map((extension: unknown) => `.${String(extension)}`).sort();
+  assert.deepEqual(lintExtensions, [...COMPILED_EXTENSIONS.keys()].sort());
+  assert.deepEqual(lintExtensions, [".cts", ".mts", ".ts", ".tsx"]);
+});
+
+for (const extension of COMPILED_EXTENSIONS.keys()) {
+  test(`a ${extension} file anywhere in src/core is linted with every isolation rule`, async () => {
+    for (const path of [`src/core/fixture${extension}`, `src/core/io/nested/fixture${extension}`]) {
+      const filePath = join(repositoryRoot, path);
+      assert.equal(await eslint.isPathIgnored(filePath), false, path);
+      const config: unknown = await eslint.calculateConfigForFile(filePath);
+      const rules = isRecord(config) && isRecord(config["rules"]) ? config["rules"] : {};
+      for (const rule of [CORE_IMPORTS, CORE_GLOBALS, "no-restricted-imports", "no-restricted-syntax", "no-restricted-globals"]) {
+        assert.ok(Array.isArray(rules[rule]) && rules[rule][0] === 2, `${rule} is not an error at ${path}`);
+      }
+    }
+  });
+}
+
+test("every file under src/core has an extension that tsc compiles and lint covers", () => {
+  const uncovered = (directory: string): string[] =>
+    listFiles(directory)
+      .filter((file) => !COMPILED_EXTENSIONS.has(extname(file)))
+      .map((file) => relative(directory, file).split(sep).join("/"));
+  assert.deepEqual(uncovered(join(repositoryRoot, "src", "core")), []);
+  // Negative control: JavaScript and other files would escape lint and the guard, so they are reported.
+  const tree = mkdtempSync(join(tmpdir(), "blueprint-drafter-extensions-"));
+  try {
+    for (const file of ["ok.ts", "ok.tsx", "types.d.ts", "a.js", "b/c.mjs", "d.cjs", "e.jsx", "f.json"]) {
+      mkdirSync(join(tree, file, ".."), { recursive: true });
+      writeFileSync(join(tree, file), "");
+    }
+    assert.deepEqual(uncovered(tree), ["a.js", "b/c.mjs", "d.cjs", "e.jsx", "f.json"]);
+  } finally {
+    rmSync(tree, { recursive: true, force: true });
+  }
+});
+
+test("no tsconfig enables allowJs or checkJs (tsc would then compile .js and .jsx files that lint does not cover)", () => {
+  const configs = readdirSync(repositoryRoot).filter((name) => /^tsconfig.*\.json$/.test(name));
+  assert.ok(configs.includes("tsconfig.json") && configs.includes("tsconfig.build.json"));
+  for (const name of configs) {
+    const options = readJson(name)["compilerOptions"];
+    const compilerOptions = isRecord(options) ? options : {};
+    assert.notEqual(compilerOptions["allowJs"], true, `${name} enables allowJs`);
+    assert.notEqual(compilerOptions["checkJs"], true, `${name} enables checkJs`);
+  }
 });

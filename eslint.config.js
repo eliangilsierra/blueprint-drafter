@@ -11,7 +11,8 @@ export default defineConfig(
   },
   {
     name: "blueprint-drafter/typescript",
-    files: ["**/*.{ts,mts,cts}"],
+    // Every TypeScript extension tsc compiles; the core rules rely on this block for parsing (#59, .tsx included).
+    files: ["**/*.{ts,tsx,mts,cts}"],
     extends: [tseslint.configs.strictTypeChecked],
     languageOptions: {
       parserOptions: {

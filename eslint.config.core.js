@@ -67,7 +67,14 @@ export const CORE_GLOBAL_MEMBERS = {
   module: [],
 };
 
-const CORE_FILES = "src/core/**/*.{ts,mts,cts}";
+/**
+ * Every extension that tsc compiles from src/core with this repository's tsconfig (allowJs is off, so .js, .mjs,
+ * .cjs and .jsx are neither compiled nor emitted). test/scaffold/core-isolation.test.ts fails when src/core holds
+ * a file with another extension or when a tsconfig enables allowJs, so this list cannot silently fall behind.
+ */
+export const CORE_SOURCE_EXTENSIONS = ["ts", "tsx", "mts", "cts"];
+const extensions = `{${CORE_SOURCE_EXTENSIONS.join(",")}}`;
+const CORE_FILES = `src/core/**/*.${extensions}`;
 const coreDirectory = fileURLToPath(new URL("./src/core", import.meta.url));
 
 // No slash in the pattern: esquery (no-restricted-syntax selectors) ends a regular expression at the first slash.
@@ -122,7 +129,7 @@ function allowImports(grantedNodeModules = []) {
 export const coreIsolation = [
   {
     name: "blueprint-drafter/core-isolation",
-    // tsc compiles .mts and .cts too, so the rules must cover them.
+    // Every extension tsc compiles (.tsx, .mts and .cts too), so the rules cover every emitted file.
     files: [CORE_FILES],
     linterOptions: { noInlineConfig: true },
     plugins: { "blueprint-drafter": plugin },
@@ -148,7 +155,7 @@ export const coreIsolation = [
     // Task #34 (workspace-confined file access, atomic writes): src/core/io is the only core module that reads
     // and writes user files (architecture section 9 B2).
     name: "blueprint-drafter/core-isolation/io-fs",
-    files: ["src/core/io/**/*.{ts,mts,cts}"],
+    files: [`src/core/io/**/*.${extensions}`],
     rules: { "blueprint-drafter/core-imports": allowImports(["node:fs", "node:fs/promises"]) },
   },
   {
