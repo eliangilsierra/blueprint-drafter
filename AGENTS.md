@@ -13,9 +13,23 @@ ADR-0007).
   committed `package-lock.json`; ESLint 10 with typescript-eslint; tests with the built-in `node:test` runner. One package, one binary
   (`blueprint-drafter`), no bundler, no monorepo tool (ADR-0007).
 - Install: `npm ci`
-- Lint: `npm run lint` (ESLint, type-aware; `src/core/**` also forbids the modules and globals listed in
-  `eslint.config.core.js` (code evaluation, processes, network, computed module specifiers) and ignores inline
-  `eslint-disable` comments: NFR-8; `docs/research/**` is not linted)
+- Lint: `npm run lint` (ESLint, type-aware; `docs/research/**` is not linted). `src/core/**` has the isolation
+  rules of `eslint.config.core.js` (NFR-8), and inline directives (`eslint-disable`, `eslint-env`, `global`) are
+  ignored there.
+- Core isolation (#59) is an **allow-list**. A core file may import only files that resolve inside `src/core`, the
+  Node.js built-ins `node:buffer`, `node:crypto`, `node:path`, `node:perf_hooks`, `node:url`, `node:util`, and the
+  reviewed packages of `eslint-rules/core-allowlist.js` (`fontkit`, `elkjs`, `@resvg/resvg-js`). Per-file grants:
+  `node:fs` and `node:fs/promises` in `src/core/io/**` (#34) and in the font loader `src/core/text/fonts.ts`
+  (#17); `node:worker_threads` in `src/core/layout/worker.ts` and `src/core/layout/worker-runner.ts` (#21).
+  `process` may be read only as `process.platform`; `globalThis`, `global`, `module` and `.constructor` may not be
+  used. To request an exception, add one entry to `eslint-rules/core-allowlist.js` (a package, every field filled)
+  or one grant block to `eslint.config.core.js` in the Pull Request that needs it, and say so in its description:
+  the security review checks it. Lint is the first line of defence and stops mistakes, not a determined bypass;
+  the second is the throwing-stub guard (`test/scaffold/core-stubs.test.ts` with the reusable installer
+  `test/scaffold/support/forbidden-apis.ts`), which imports every core module and runs the core on the corpus with
+  the process, network, file-write and code-evaluation APIs replaced by throwing stubs. A core module must have no
+  side effect on import. `test/scaffold/core-dependencies.test.ts` reviews the listed packages offline (needs
+  `npm ci --ignore-scripts`).
 - Type check: `npm run typecheck` (`tsc --noEmit` over `src/`, `test/` and `bench/`)
 - Test: `npm test` (first compiles `src/` and `test/` with `tsc` into `dist-test/`, then runs
   `node --test` on the compiled `*.test.js` files; works on every Node.js 22 minor without
