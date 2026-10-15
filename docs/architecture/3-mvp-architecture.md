@@ -280,7 +280,8 @@ tree is in §9 (B5).
 committed unmodified under `fonts/` together with the OFL text, taken once from the official IBM Plex
 release, and pinned by SHA-256 in a test. Their provenance (release `@ibm/plex-sans@1.1.0` of
 `IBM/plex`, asset `ibm-plex-sans.zip` with its SHA-256, the extracted files) is recorded in
-`THIRD_PARTY_NOTICES.md`, and `fonts/SHA256SUMS` is the list the test reads. The npm package `@ibm/plex-sans`, which the prototype used,
+`THIRD_PARTY_NOTICES.md`, and `fonts/SHA256SUMS` lists the file hashes; the SHA-256 test (not yet on
+`develop`; WP-1 and WP-17) reads that list. The npm package `@ibm/plex-sans`, which the prototype used,
 is **neither a runtime nor a development dependency**: its `postinstall` script runs IBM's telemetry
 tool (`@ibm/telemetry-js`), which would break NFR-10 and the offline install. The published package
 ships the same files and never writes into its own installation directory.
@@ -548,7 +549,8 @@ formatDiagnostics(result: CheckResult | ApplyResult, opts?: { json?: boolean; ma
 // File pipelines: the ONLY functions the CLI and the MCP server call for file work, so both
 // adapters share one implementation of reading, limits, batch rejection, hashing and writing.
 // ws = null means no confinement (CLI without --workspace); the MCP server always passes a Workspace.
-// Every file pipeline takes limits?: Partial<Limits> in its options (one options bag, #56 CR-18).
+// Every file pipeline (newFile to formatPaths) takes limits?: Partial<Limits> in its options bag
+// (#56 CR-18); findDiagramFiles and the low-level readDiagramFile keep it positional (task #53).
 newFile(ws: Workspace | null, path: string,
         opts: { type: DiagramType; title?: string; dir?: Direction; limits?: Partial<Limits> }): Promise<FileResult>;
 applyFile(ws: Workspace | null, path: string, ops: string[],
@@ -666,14 +668,15 @@ serialiser does by itself. The rejected alternative, Unicode letters, would let 
 same differ (composed and decomposed accents, homoglyphs) and would need a normalisation rule; relaxing
 to Unicode later is additive.
 
-Closed value sets:
+Closed value sets (the model tests read this table: every backticked word of the Values column is a
+closed value, so explanations in that column stay outside backticks):
 
 | Item | Values |
 | --- | --- |
 | `type` | `flow`, `c4-context`, `c4-container`, `component`, `architecture`, `sequence` |
 | `NODE-KIND` | `start`, `end`, `process`, `decision`, `io`, `subprocess`, `person`, `system`, `external`, `container`, `service`, `component`, `webapp`, `mobile`, `gateway`, `function`, `db`, `cache`, `storage`, `queue`, `topic`, `module`, `actor`, `participant` |
 | `GROUP-KIND` | `boundary`, `zone`, `cluster`, `layer`, `group` |
-| `dir` (header) | `TB`, `LR`, `BT`, `RL` (default per type, §6.3; `TB` for `sequence`, Proposed) |
+| `dir` (header) | `TB`, `LR`, `BT`, `RL` (default per type, §6.3; TB for sequence, Proposed) |
 | `theme` / `density` | `light` (default), `dark` / `compact`, `normal` (default), `airy` |
 | `style` / `dir` (edge) | `sync` (default), `async`, `reply`, `dep` / `fwd` (default), `both`, `none` |
 
@@ -681,7 +684,10 @@ Rules:
 
 - **Ids** are case-sensitive and unique across groups, nodes and edges. The engine never changes an
   author-chosen id. A value in an id position (statement id, `in=`, `id=`, an edge endpoint, a
-  constraint id, `from=`, `to=`) that does not match `ID` is `E_BAD_ID`. Length is a limit, not part
+  constraint id, `from=`, `to=`) that does not match `ID` is `E_BAD_ID`. For an edge reference, the
+  boundary is: a token that does not have the form `x>y` or `x>y#n` (no `>`, `#0`, `#1`, a leading
+  zero, a character outside ASCII) is `E_SYNTAX` (malformed edge reference); a well-formed reference
+  whose endpoint is not an `ID` (`9a>b`) is `E_BAD_ID`. Length is a limit, not part
   of the pattern: an id longer than `maxIdChars` is `E_LIMIT_EXCEEDED` (limit `maxIdChars`), checked
   after parsing and before layout (§9 B1), and never `E_BAD_ID`. Reason: limit values are configurable
   and not frozen (§7.1), so a fixed length in the frozen pattern would contradict a configured limit.
@@ -718,8 +724,9 @@ Rules:
   **Unknown statement keyword:** `E_UNKNOWN_STATEMENT` (blocking).
 - **Tags (#56, ADR-0008):** `tags` holds a set of opaque user tags, written as one value with the
   tags separated by `,` (`tags=api,public`; the quoted form `tags="api,public"` is read the same way).
-  Each tag matches `1*( letter | digit | "_" | "." | ":" | "/" | "+" | "-" )`; an empty tag or any
-  other character is `E_BAD_VALUE`. Duplicates are dropped; the serialiser writes the tags sorted by
+  Each tag matches `1*( letter | digit | "_" | "." | ":" | "/" | "+" | "-" )`; an empty tag inside a
+  non-empty value (`a,,b`, `,a`, `a,`) or any other character is `E_BAD_VALUE`, while `tags=""` is the
+  empty value of the next rule (absent, or clearing in an update). Duplicates are dropped; the serialiser writes the tags sorted by
   code point as a bare word. Like `meta.*`, tags are never used for layout or rendering in v1. The
   model holds `tags?: string[]`.
 - **Empty values (#56, ADR-0008):** the empty value is the empty quoted string `""`; a bare `key=`
@@ -849,8 +856,8 @@ Batch rules (FR-10, AC-12):
    edit that splits an oversized diagram must remain possible) and `E_LAYOUT_TIMEOUT` or `E_INTERNAL`
    is returned as a problem with status `failed` (CLI exit code 2). What the caller sees (#56 CR-19):
    the result has `written: true` and the `changes`; the CLI text is the accepted output
-   (`ok <n> change(s)` and the changes) with the `check:` line replaced by the error finding line, so
-   its first line says that the batch was applied; the MCP result is `isError: true` with the first
+   (`ok <n> change(s)` and the changes) followed by `check: failed file=<path>` and the error finding
+   line instead of the summary line (§7.4), so its first line says that the batch was applied; the MCP result is `isError: true` with the first
    line `<CODE> <message>` (§7.6) followed by the same text. The fix of the error says that the batch
    was written and must not be re-applied.
 6. Unknown ids get a suggestion: the closest existing id by edit distance, within a distance bound and
@@ -872,7 +879,9 @@ no changes written
 
 Text form, one line per finding: `<S> <CODE> <ids> — <message> | fix: <fix>`, where `<S>` is `E`, `W`
 or `I`, preceded by a summary line
-`check: <n>E <n>W <n>I · nodes=<n> edges=<n> crossings=<n> size=<w>x<h> profile=<name>`. JSON form is
+`check: <n>E <n>W <n>I · nodes=<n> edges=<n> crossings=<n> size=<w>x<h> profile=<name> file=<path>`
+(the `file=<path>` field is present when the result belongs to a file, that is in every CLI and MCP
+output; `formatDiagnostics` of an in-memory `CheckResult` omits it). JSON form is
 the `Diagnostic` type (§7.1); the JSON `diagnostics` array lists every severity. The catalogue is a
 closed list in v1 (new codes may be added; see the contract scope in §7.1).
 
@@ -880,6 +889,13 @@ Exact line shapes (#56, frozen in v1 with the rest of the output, §7.1):
 
 - **Separators:** the dash is U+2014 with one space on each side; the `| fix: <fix>` part (with one
   space before it) is present only when the finding has a fix.
+- **One header line per file (#56 QA-3c):** in the text form, the findings of a file always follow a
+  `check:` line that names the file. A file that was evaluated has the summary line above. A file
+  that could not be evaluated (a file, limit or syntax code, or a layout that failed or timed out)
+  has the line `check: failed file=<path>` instead, followed by its finding lines; so a file-level
+  error (`E_FILE_NOT_FOUND`, `E_NOT_REGULAR_FILE`, `E_OUTSIDE_WORKSPACE`, `E_BAD_EXTENSION`,
+  `E_STALE_FILE`, `E_EXISTS`) is attributed to its file although its message names no path. `fmt`
+  reports a file it cannot read or parse the same way.
 - **`<ids>`:** the ids joined by `,` without spaces (an `ID` cannot contain `,`, so the list is
   unambiguous; the same separator as constraints). A finding without ids omits `<ids>` and its space:
   `E E_LAYOUT_TIMEOUT — <message>`.
@@ -925,7 +941,7 @@ not complete its normal output; nothing is written except in the case of rule 5 
 | `E_MISSING_HEADER` | error | First statement is not the header | line | `diagram 1 type=...` |
 | `E_VERSION_UNSUPPORTED` | error | Header version higher than supported | line | Upgrade the tool |
 | `E_UNKNOWN_STATEMENT` | error | Unknown keyword | line | List of keywords |
-| `E_UNKNOWN_ATTR` | error | Attribute key not allowed for the statement (including geometry or style keys; `label=` or `kind=` outside an update) | line, element id | Closest key, or `meta.<key>`; for `label=` and `kind=` outside an update: "the label is positional" or "the kind is positional" |
+| `E_UNKNOWN_ATTR` | error | Attribute key not allowed for the statement (including geometry or style keys; `label=` or `kind=` outside an update) | line, element id | Closest key, or `meta.<key>`; for `label=` outside an update: "the label is positional"; for `kind=` on a group or node line or add: "the kind is positional"; `kind=` on an edge (edges have no kind): closest key |
 | `E_BAD_VALUE` | error | Value outside the closed sets of `type`, header `dir`, `theme`, `density`, edge `style` or edge `dir`; empty value `""` for a required value (§7.2, §7.3); an empty or invalid tag (kinds are never `E_BAD_VALUE`, §6.3) | line, element id | Valid values |
 | `E_INVALID_OP` | error | Operation without `+`, `~` or `-`, or not allowed (for example `+diagram`) | op index | Correct form |
 | `E_UNKNOWN_ID` | error | `~` or `-` on an id that does not exist | op index, id | Closest id or `+node` |
@@ -1007,8 +1023,9 @@ evaluation (Q-5, #1 R-3).
 - **Output:** compact text by default: the summary line, then at most `--max` finding lines (default
   20), errors and warnings first and info findings only when room is left, exactly as in §7.4; `--json`
   prints one JSON object with `"schema": 1` and the same content in full (every severity, ASCII only,
-  §7.4). Every `check:` line printed for a file ends with the field `file=<path>` (path rule of §7.4), so
-  several files can be told apart. Output never contains colour codes or timings. Errors go to stderr.
+  §7.4). Each file's findings follow its `check:` line, which ends with the field `file=<path>` (path
+  rule of §7.4), or `check: failed file=<path>` when the file could not be evaluated (§7.4), so several
+  files can be told apart. Output never contains colour codes or timings. Errors go to stderr.
 - **Limits:** the CLI and the MCP server use `DEFAULT_LIMITS`; v1 has no option to change a limit
   from the command line or a tool call (#56 CR-18). Embedders configure limits through the `limits`
   option of every file pipeline (§7.1), which is also how the limit tests (AC-45) set them. Rejected
