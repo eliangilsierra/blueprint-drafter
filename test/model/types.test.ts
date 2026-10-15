@@ -462,8 +462,8 @@ describe("model depends on nothing (architecture section 6.1)", () => {
   const directory = join(repositoryRoot, "src", "core", "model");
   const files = readdirSync(directory).filter((name) => name.endsWith(".ts"));
 
-  it("contains the five files of the task", () => {
-    assert.deepEqual([...files].sort(), ["diagnostics.ts", "enums.ts", "index.ts", "types.ts", "util.ts"]);
+  it("contains the files of the model tasks", () => {
+    assert.deepEqual([...files].sort(), ["diagnostics.ts", "enums.ts", "geometry.ts", "index.ts", "types.ts", "util.ts"]);
   });
 
   for (const file of files) {
