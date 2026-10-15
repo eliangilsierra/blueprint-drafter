@@ -16,7 +16,8 @@ ADR-0007).
 - Lint: `npm run lint` (ESLint, type-aware; `docs/research/**` is not linted). `src/core/**` has the isolation
   rules of `eslint.config.core.js` (NFR-8), and inline directives (`eslint-disable`, `eslint-env`, `global`) are
   ignored there.
-- Core isolation (#59) is an **allow-list**. A core file may import only files that resolve inside `src/core`, the
+- Core isolation (#59) is an **allow-list** over every file `tsc` compiles from `src/core` (`.ts`, `.tsx`, `.mts`,
+  `.cts`; `allowJs` stays off, and any other file type in `src/core` fails a test). A core file may import only files that resolve inside `src/core`, the
   Node.js built-ins `node:buffer`, `node:crypto`, `node:path`, `node:perf_hooks`, `node:url`, `node:util`, and the
   reviewed packages of `eslint-rules/core-allowlist.js` (`fontkit`, `elkjs`, `@resvg/resvg-js`). Per-file grants:
   `node:fs` and `node:fs/promises` in `src/core/io/**` (#34) and in the font loader `src/core/text/fonts.ts`
