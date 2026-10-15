@@ -1,7 +1,7 @@
 import { defineConfig } from "eslint/config";
 import tseslint from "typescript-eslint";
 
-import { coreIsolation } from "./eslint.config.core.js";
+import { CORE_SOURCE_EXTENSIONS, coreIsolation } from "./eslint.config.core.js";
 
 export default defineConfig(
   {
@@ -11,7 +11,9 @@ export default defineConfig(
   },
   {
     name: "blueprint-drafter/typescript",
-    files: ["**/*.{ts,mts,cts}"],
+    // Every TypeScript extension tsc compiles (one list, in eslint.config.core.js); the core rules rely on this
+    // block for parsing (#59).
+    files: [`**/*.{${CORE_SOURCE_EXTENSIONS.join(",")}}`],
     extends: [tseslint.configs.strictTypeChecked],
     languageOptions: {
       parserOptions: {

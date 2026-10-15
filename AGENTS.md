@@ -13,9 +13,31 @@ ADR-0007).
   committed `package-lock.json`; ESLint 10 with typescript-eslint; tests with the built-in `node:test` runner. One package, one binary
   (`blueprint-drafter`), no bundler, no monorepo tool (ADR-0007).
 - Install: `npm ci`
-- Lint: `npm run lint` (ESLint, type-aware; `src/core/**` also forbids the modules and globals listed in
-  `eslint.config.core.js` (code evaluation, processes, network, computed module specifiers) and ignores inline
-  `eslint-disable` comments: NFR-8; `docs/research/**` is not linted)
+- Lint: `npm run lint` (ESLint, type-aware; `docs/research/**` is not linted). `src/core/**` has the isolation
+  rules of `eslint.config.core.js` (NFR-8), and inline directives (`eslint-disable`, `eslint-env`, `global`) are
+  ignored there.
+- Core isolation (#59) has three layers: the **allow-list** and the **deny-list** (lint, `eslint.config.core.js`)
+  and the **runtime stubs** (`test/scaffold/core-stubs.test.ts`, installer `test/scaffold/support/forbidden-apis.ts`,
+  which imports every core module and runs the core on the corpus with process, network, file-write and
+  code-evaluation APIs replaced by throwing stubs). They stop mistakes, not a determined bypass.
+  - Scope: every file `tsc` compiles from `src/core` (`.ts`, `.tsx`, `.mts`, `.cts`; `allowJs` stays off; any other
+    file type or a symbolic link in `src/core` fails a test). A core module has no side effect on import.
+  - Allowed imports: files that resolve inside `src/core`; `node:buffer`, `node:crypto` (hashing only, kept by
+    review), `node:path`, `node:perf_hooks`, `node:url`, `node:util`; the packages of `eslint-rules/core-allowlist.js`
+    (`fontkit`, `elkjs`, `@resvg/resvg-js`). Per-file grants: `node:fs` and `node:fs/promises` in `src/core/io/**`
+    (#34) and in the font loader `src/core/text/fonts.ts` (#17); `node:worker_threads` in
+    `src/core/layout/worker.ts` and `src/core/layout/worker-runner.ts` (#21). `process` may be read only as
+    `process.platform`; `globalThis`, `global`, `module` and the word `constructor` (also as a string; use a `Map` or
+    `Object.hasOwn` for reserved keys) may not be used.
+  - To add a package: one entry in `eslint-rules/core-allowlist.js` with every field and the exact version that is
+    in `package.json`; run `npm ci --ignore-scripts` and `test/scaffold/core-dependencies.test.ts` (it scans the
+    package offline); update the pinned list in "the allow-list options for src/core are exactly the reviewed lists".
+  - To add a grant: grant the narrowest path (a file, not a directory) in its own block of `eslint.config.core.js`
+    with the task and the reason; if the deny-list also names the module, drop it from `denyRules` for that block
+    only; add ALLOWED and REJECTED rows to `test/scaffold/core-isolation.test.ts`; for a `process` member, change
+    `CORE_GLOBAL_MEMBERS` and its pin test; for a worker file, add it to `workerCallers` in `core-stubs.test.ts`.
+    The stubs do not run inside a worker thread, and lint cannot limit a granted module to some of its exports.
+  - Say so in the Pull Request description: the security review checks every change of these lists.
 - Type check: `npm run typecheck` (`tsc --noEmit` over `src/`, `test/` and `bench/`)
 - Test: `npm test` (first compiles `src/` and `test/` with `tsc` into `dist-test/`, then runs
   `node --test` on the compiled `*.test.js` files; works on every Node.js 22 minor without
