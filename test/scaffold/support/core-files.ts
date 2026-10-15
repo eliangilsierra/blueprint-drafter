@@ -41,6 +41,14 @@ export function listFiles(directory: string): string[] {
     .sort();
 }
 
+/** Every symbolic link (or Windows junction) under a directory, at any depth, sorted. */
+export function listSymbolicLinks(directory: string): string[] {
+  return readdirSync(directory, { withFileTypes: true, recursive: true })
+    .filter((entry) => entry.isSymbolicLink())
+    .map((entry) => join(entry.parentPath, entry.name))
+    .sort();
+}
+
 /** True for a file that tsc compiles to JavaScript (not a declaration file). */
 export function isCompiledSource(file: string): boolean {
   return COMPILED_EXTENSIONS.has(extname(file)) && !DECLARATION.test(file);

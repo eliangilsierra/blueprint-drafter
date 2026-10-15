@@ -247,3 +247,20 @@ test("residual (pinned): the static scan does not see a module name computed at 
   };
   assert.deepEqual(review(tree, [entry("good-lib", "1.0.0")]), []);
 });
+
+test("residual 13 (pinned, SR-3): the scan sees only literal module names, not aliases or other capabilities", () => {
+  // The scan reads `require("x")`, `import("x")`, `from "x"`, process.binding and getBuiltinModule. These forms
+  // pass it today; the throwing stubs catch each of them when the code runs under the guard. Widening the scan
+  // (with the exceptions mechanism) is a follow-up; when it lands, turn these into expected findings.
+  for (const source of [
+    'const r = require;\nr("child_process");\n',
+    'require("node:module").createRequire(__filename)("child_" + "process");\n',
+    'eval("1");\n',
+    'new Function("return 1")();\n',
+    'fetch("https://example.invalid");\n',
+    'new Worker("./x.js");\n',
+    "const home = process.env.HOME;\n",
+  ]) {
+    assert.deepEqual(scanText(source, forbiddenModules).filter((module) => module !== "module"), [], source);
+  }
+});

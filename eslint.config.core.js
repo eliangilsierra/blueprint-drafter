@@ -4,7 +4,8 @@
 // rules cannot be switched off from inside the code they guard. Never weaken these rules to make a change pass;
 // move the code to an adapter (src/cli, src/mcp) instead.
 //
-// Two layers, both linted:
+// Three layers, named the same way everywhere (AGENTS.md, tests, Pull Requests): the allow-list and the deny-list
+// below are lint; the runtime stubs (test/scaffold/support/forbidden-apis.ts, AC-44) are the third layer.
 // 1. Allow-list (rule blueprint-drafter/core-imports, eslint-rules/core-imports.js): every import form (static,
 //    `export ... from`, `import x = require()`, `import()`, `require()`) may name only a file that resolves inside
 //    src/core, a Node.js built-in from CORE_NODE_MODULES (written "node:<name>"), or a reviewed package from
@@ -14,6 +15,11 @@
 //    the list would have to be written three times.
 // 2. Deny-list (no-restricted-imports, no-restricted-syntax, no-restricted-globals, no-restricted-properties):
 //    names the forbidden modules and globals, so the message is explicit when one of them is used.
+// 3. Runtime stubs: the guard tests import every core module and run the core with the APIs of FORBIDDEN_MODULES,
+//    file writes and code evaluation replaced by throwing stubs (derived from the lists of this file).
+//
+// Grants are per module (residual risk 12 of #59): lint cannot limit a granted module to some of its exports, so
+// "node:crypto for hashing" or "a Worker without eval: true" are kept by review, not by a rule.
 //
 // Aliases of process and globalThis, and the Function constructor through a prototype (decision of #59):
 // rejected by lint. blueprint-drafter/core-globals (eslint-rules/core-globals.js) allows `process`, `globalThis`,
@@ -25,7 +31,7 @@
 // `Reflect.get(fn, "constr" + "uctor")`, or a third-party package that computes a module name) are caught at run
 // time by the throwing stubs of
 // test/scaffold/support/forbidden-apis.ts (AC-44); test/scaffold/core-isolation.test.ts and core-stubs.test.ts
-// pin both layers. The control stops mistakes and casual bypasses; it is not a sandbox.
+// pin all three layers. The control stops mistakes and casual bypasses; it is not a sandbox.
 
 import { fileURLToPath } from "node:url";
 
@@ -89,8 +95,10 @@ const FORBIDDEN_PROCESS_PROPERTIES = ["getBuiltinModule", "binding", "dlopen"];
 const message = "src/core must be pure and local (no code evaluation, processes or network). Use an adapter instead.";
 const dynamicMessage =
   "src/core must load modules by string literal only: a computed specifier hides what is loaded. Use an adapter instead.";
+// The selectors reject the word "constructor" as a property and as any string, also in a Set or a type (CR-7 of
+// PR #61, decision kept): a narrower selector would let `const k = "constructor"; f[k]` through.
 const constructorMessage =
-  "src/core must not read `.constructor`: it reaches the Function constructor (code evaluation). Use instanceof or Object.getPrototypeOf instead.";
+  'src/core must not name `constructor` (a `.constructor` access or the string "constructor"): it reaches the Function constructor (code evaluation). Use instanceof or Object.getPrototypeOf; to guard reserved keys of user data, use a Map or Object.hasOwn and keep the word out of the source.';
 
 /** Deny-list rules for the given forbidden modules (a grant block removes the module it grants). */
 function denyRules(forbiddenModules) {
@@ -168,6 +176,7 @@ export const coreIsolation = [
   {
     // Task #21 (layout worker with a time budget and a heap ceiling): a worker thread is not a child process.
     // Only the worker entry and its runner may use node:worker_threads; the deny-list drops it for these two files.
+    // A grant of a module that the deny-list also names needs both edits: allowImports([...]) and denyRules(filter).
     name: "blueprint-drafter/core-isolation/layout-worker",
     files: ["src/core/layout/worker.ts", "src/core/layout/worker-runner.ts"],
     rules: {

@@ -5,8 +5,8 @@
 //   - relative ("./", "../") and resolves inside the core directory, with the URL rules Node.js applies
 //     ("%2e%2e" is "..", a backslash is a slash), so no depth or encoding leaves src/core;
 //   - a Node.js built-in written as "node:<name>" that is in the `nodeModules` option (exact match);
-//   - a package in the `packages` option, or a plain subpath of it with no ".", ".." or encoded segment
-//     (a package without an "exports" map resolves "pkg/../other" to another package).
+//   - a package in the `packages` option, or a plain subpath of it with no ".", "..", encoded or "node_modules"
+//     segment (a package without an "exports" map resolves "pkg/../other" to another package).
 // Anything else is reported: other packages, built-ins without the "node:" prefix, absolute paths, URLs such
 // as "data:" and "file:", and specifiers that are not a string literal, because they cannot be checked.
 // The rule is lexical; the throwing-stub tests in test/scaffold/ are the second layer.
@@ -123,7 +123,10 @@ export default {
       }
       if (!URL_SCHEME.test(specifier)) {
         const { name, subpath } = splitBare(specifier);
-        const plainSubpath = subpath.every((segment) => /^[A-Za-z0-9_@+~-][A-Za-z0-9._@+~-]*$/.test(segment));
+        // A nested node_modules segment would reach a package that is not on the list (SR-6 of PR #61).
+        const plainSubpath = subpath.every(
+          (segment) => segment !== "node_modules" && /^[A-Za-z0-9_@+~-][A-Za-z0-9._@+~-]*$/.test(segment),
+        );
         if (PACKAGE_NAME.test(name) && packages.has(name) && plainSubpath) {
           return;
         }

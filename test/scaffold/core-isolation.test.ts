@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { extname, join, relative, sep } from "node:path";
 import { test } from "node:test";
@@ -9,7 +9,7 @@ import { ESLint } from "eslint";
 import tseslint from "typescript-eslint";
 
 import { isRecord, readJson, repositoryRoot } from "./helpers.js";
-import { COMPILED_EXTENSIONS, listFiles } from "./support/core-files.js";
+import { COMPILED_EXTENSIONS, listFiles, listSymbolicLinks } from "./support/core-files.js";
 
 // These tests load the real eslint.config.js of the repository, so removing or narrowing the isolation block
 // (or the ignores) there makes them fail. Fixtures are linted as text at paths that do not exist on disk, which
@@ -219,6 +219,12 @@ const REJECTED: readonly Fixture[] = [
   { name: "an alias of process in a .tsx file", code: "const p = process;\nexport const x: unknown = p;\n", path: "src/core/fixture.tsx", rule: CORE_GLOBALS },
   { name: "(() => {}).constructor in a .tsx file", code: "export const run = (): unknown => (() => undefined).constructor;\n", path: "src/core/fixture.tsx", rule: "no-restricted-syntax" },
   { name: "node:fs in a .tsx file outside src/core/io", code: importOf("node:fs"), path: "src/core/text/fonts.tsx", rule: CORE_IMPORTS },
+  // Reviews of PR #61: SR-6 (a nested node_modules segment) and the decision of CR-7 (the word is banned as a
+  // string too, also in a Set or a type, so that `const k = "constructor"; f[k]` cannot be written).
+  { name: "a listed package subpath with a node_modules segment", code: importOf("fontkit/node_modules/ws/index.js"), path: CORE_FILE, rule: CORE_IMPORTS },
+  { name: 'the string "constructor" in a Set of reserved keys', code: 'export const reserved = new Set(["constructor", "__proto__"]);\n', path: CORE_FILE, rule: "no-restricted-syntax" },
+  { name: 'the string "constructor" in a type', code: 'export type Key = "constructor" | "id";\n', path: CORE_FILE, rule: "no-restricted-syntax" },
+  { name: 'the string "constructor" kept in a variable', code: 'const key = "constructor";\nexport const make = (f: () => void): unknown => Reflect.get(f, key);\n', path: CORE_FILE, rule: "no-restricted-syntax" },
 ];
 
 for (const fixture of REJECTED) {
@@ -396,6 +402,34 @@ test("every file under src/core has an extension that tsc compiles and lint cove
     rmSync(tree, { recursive: true, force: true });
   }
 });
+
+test("src/core holds no symbolic link, which lint, the guard and the extension check would not follow (SR-2)", () => {
+  assert.deepEqual(listSymbolicLinks(join(repositoryRoot, "src", "core")), []);
+  // Negative control: a directory link (a junction on Windows, which needs no privilege) is reported.
+  const tree = mkdtempSync(join(tmpdir(), "blueprint-drafter-links-"));
+  try {
+    mkdirSync(join(tree, "real"));
+    symlinkSync(join(tree, "real"), join(tree, "linked"), "junction");
+    assert.deepEqual(listSymbolicLinks(tree).map((file) => relative(tree, file)), ["linked"]);
+  } finally {
+    rmSync(tree, { recursive: true, force: true });
+  }
+});
+
+// Residual risk 12 (SR-4 of PR #61), pinned: grants are per module, so lint cannot see these uses. Review keeps
+// them out (node:crypto for hashing only; the worker of #21 without eval: true). If a rule learns to reject one,
+// move it to REJECTED.
+const RESIDUAL_GRANT_FORMS: ReadonlyArray<readonly [string, string, string]> = [
+  ["randomUUID from node:crypto (not hashing)", 'import { randomUUID } from "node:crypto";\nexport const id = (): string => randomUUID();\n', CORE_FILE],
+  ["a Worker with eval: true in the granted runner", 'import { Worker } from "node:worker_threads";\nexport const start = (code: string): Worker => new Worker(code, { eval: true });\n', "src/core/layout/worker-runner.ts"],
+];
+
+for (const [name, code, path] of RESIDUAL_GRANT_FORMS) {
+  test(`residual 12 (pinned): lint allows ${name}`, async () => {
+    const inCore = await lint(code, path);
+    assert.deepEqual(inCore.filter((ruleId) => ISOLATION_RULES.includes(ruleId)), []);
+  });
+}
 
 test("no tsconfig enables allowJs or checkJs (tsc would then compile .js and .jsx files that lint does not cover)", () => {
   const configs = readdirSync(repositoryRoot).filter((name) => /^tsconfig.*\.json$/.test(name));

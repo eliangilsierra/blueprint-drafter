@@ -12,7 +12,8 @@
 //                  planned by that task
 //   reason         why the core needs it and what it is used for
 //   licence        the licence and the ADR-0005 class it was checked against
-//   reviewed       date of the review (YYYY-MM-DD) and what was reviewed
+//   reviewed       date of the review (YYYY-MM-DD)
+//   review         what was reviewed and what was found (scan, install scripts, audit)
 //   exceptions     findings of the static scan (a forbidden module named in the package or one of its production
 //                  dependencies) that were read and accepted: package, file (relative to that package), modules,
 //                  reason. Any other finding fails the test.
