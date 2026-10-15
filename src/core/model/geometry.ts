@@ -416,7 +416,8 @@ function mergeClose(points: Point[]): Point[] {
 }
 
 // Smallest parameter t in [0, 1] at which the segment p->q meets the segment a->b, or null. Handles zero-length
-// segments on either side and collinear overlap (the start of the overlap is reported).
+// segments on either side and collinear overlap (the start of the overlap is reported). A zero-length edge a->b
+// has no direction, so it takes the "parallel" path below and is treated as the point a.
 function firstContact(p: Point, q: Point, a: Point, b: Point): number | null {
   const dx = q.x - p.x;
   const dy = q.y - p.y;
@@ -427,13 +428,6 @@ function firstContact(p: Point, q: Point, a: Point, b: Point): number | null {
   if (length <= EPSILON) {
     const nearest = nearestOnSegment(p, a, b);
     return Math.hypot(p.x - nearest.x, p.y - nearest.y) <= EPSILON ? 0 : null;
-  }
-  if (edgeLength <= EPSILON) {
-    const onSegment = nearestOnSegment(a, p, q);
-    if (Math.hypot(a.x - onSegment.x, a.y - onSegment.y) > EPSILON) {
-      return null;
-    }
-    return Math.hypot(onSegment.x - p.x, onSegment.y - p.y) / length;
   }
   const denominator = dx * ey - dy * ex;
   if (Math.abs(denominator) <= PARALLEL_SINE * length * edgeLength) {
@@ -459,7 +453,7 @@ function firstContact(p: Point, q: Point, a: Point, b: Point): number | null {
   return Math.max(0, Math.min(1, t));
 }
 
-function clipToRing(from: Point, to: Point, polygon: readonly Point[]): Point | null {
+function clipToRing(start: Point, end: Point, polygon: readonly Point[]): Point | null {
   let best: number | null = null;
   for (let i = 0; i < polygon.length; i++) {
     const a = polygon[i];
@@ -467,7 +461,7 @@ function clipToRing(from: Point, to: Point, polygon: readonly Point[]): Point | 
     if (a === undefined || b === undefined) {
       continue;
     }
-    const t = firstContact(from, to, a, b);
+    const t = firstContact(start, end, a, b);
     if (t !== null && (best === null || t < best)) {
       best = t;
     }
@@ -476,12 +470,12 @@ function clipToRing(from: Point, to: Point, polygon: readonly Point[]): Point | 
     return null;
   }
   if (best <= 0) {
-    return { x: from.x, y: from.y };
+    return { x: start.x, y: start.y };
   }
   if (best >= 1) {
-    return { x: to.x, y: to.y };
+    return { x: end.x, y: end.y };
   }
-  return { x: from.x + (to.x - from.x) * best, y: from.y + (to.y - from.y) * best };
+  return { x: start.x + (end.x - start.x) * best, y: start.y + (end.y - start.y) * best };
 }
 
 /** The point of the closed polygon (its last point joins its first) closest to `point`. */
@@ -498,16 +492,16 @@ export function distanceToPolygon(point: Point, polygon: readonly Point[]): numb
 }
 
 /**
- * Where the segment `from`-`to` first meets the boundary of the closed polygon, walking from `from`: the
- * point where it enters when `from` is outside, where it leaves when `from` is inside, `from` itself when it is
- * on the boundary. `null` when the segment does not reach the boundary, so the caller decides what an edge that
- * stops short of its node means. Idempotent: clipping `from`-`result` returns `result` again.
+ * Where the segment `start`-`end` first meets the boundary of the closed polygon, walking from `start`: the
+ * point where it enters when `start` is outside, where it leaves when `start` is inside, `start` itself when it
+ * is on the boundary. `null` when the segment does not reach the boundary, so the caller decides what an edge
+ * that stops short of its node means. Idempotent: clipping `start`-`result` returns `result` again.
  */
-export function clipSegmentToPolygon(from: Point, to: Point, polygon: readonly Point[]): Point | null {
-  checkPoint(from, "from");
-  checkPoint(to, "to");
+export function clipSegmentToPolygon(start: Point, end: Point, polygon: readonly Point[]): Point | null {
+  checkPoint(start, "start");
+  checkPoint(end, "end");
   checkPoints(polygon, "polygon", 1);
-  return clipToRing(from, to, polygon);
+  return clipToRing(start, end, polygon);
 }
 
 /**
@@ -573,11 +567,11 @@ function personRing(x: number, y: number, w: number, h: number): Point[] {
   const bodyHeight = Math.max(0, h - m.personBodyTop);
   const corner = Math.max(0, Math.min(m.personBodyCornerRadius, w / 2, bodyHeight / 2));
   const quarter = Math.PI / 2;
-  // The head meets the straight top edge of the body at this half chord. A body narrower than head plus corners
-  // (under about 52 px) has no room for it: the head is then cut to the straight part, an approximation that
-  // keeps the ring finite.
+  // The head meets the straight top edge of the body at this half chord (11.6 px). A body narrower than the
+  // head plus its two corners (under about 52 px) has no room for it; the ring is then still finite but its
+  // head overlaps the body corners. Node sizes from measured text are far wider.
   const rise = bodyTop - centreY;
-  const chord = Math.min(Math.sqrt(Math.max(0, radius * radius - rise * rise)), Math.max(0, w / 2 - corner));
+  const chord = Math.sqrt(Math.max(0, radius * radius - rise * rise));
   const angle = Math.acos(Math.min(1, chord / radius));
   return [
     ...arc(centreX, centreY, radius, radius, Math.PI - angle, 2 * Math.PI + angle),
@@ -595,8 +589,8 @@ function personRing(x: number, y: number, w: number, h: number): Point[] {
  *
  * `rect` has rounded corners; `pill` has half-circle ends; `pipe` has half-elliptical ends; `cylinder` has
  * half-elliptical top and bottom; `hexagon` and `diamond` are plain polygons; `person` is a round head on a
- * rounded body (the head has a fixed size and is cut to the body in boxes narrower than about 52 px). Sizes come
- * from {@link SHAPE_METRICS} and are clamped so that small boxes stay valid.
+ * rounded body (the head has a fixed size: below a width of about 52 px the ring overlaps itself but stays
+ * finite). Sizes come from {@link SHAPE_METRICS} and are clamped so that small boxes stay valid.
  */
 export function shapeOutline(shape: Shape, box: Box): Point[] {
   checkBox(box, "box");
@@ -610,7 +604,7 @@ export function shapeOutline(shape: Shape, box: Box): Point[] {
     case "rect":
       return mergeClose(roundedRectangle(x, y, w, h, m.rectCornerRadius));
     case "pill":
-      return mergeClose(roundedRectangle(x, y, w, h, Math.min(w, h) / 2));
+      return mergeClose(roundedRectangle(x, y, w, h, h / 2));
     case "diamond":
       return [
         { x: x + w / 2, y },
@@ -666,8 +660,8 @@ export function distanceToOutline(point: Point, shape: Shape, box: Box): number 
 }
 
 /** {@link clipSegmentToPolygon} against the outline of `shape` in `box`. */
-export function clipSegmentToOutline(from: Point, to: Point, shape: Shape, box: Box): Point | null {
-  return clipSegmentToPolygon(from, to, shapeOutline(shape, box));
+export function clipSegmentToOutline(start: Point, end: Point, shape: Shape, box: Box): Point | null {
+  return clipSegmentToPolygon(start, end, shapeOutline(shape, box));
 }
 
 /** {@link clipRayToPolygon} against the outline of `shape` in `box`. */

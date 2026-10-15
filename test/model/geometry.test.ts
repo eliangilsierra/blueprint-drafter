@@ -216,6 +216,24 @@ describe("shapeOutline", () => {
     }
   });
 
+  it("keeps every shape except the fixed-size person inside small and thin boxes", () => {
+    const sizes: ReadonlyArray<readonly [number, number]> = [[3, 3], [10, 10], [20, 60], [60, 20], [27, 40], [200, 5]];
+    for (const shape of SHAPES) {
+      if (shape === "person") {
+        continue;
+      }
+      for (const [w, h] of sizes) {
+        const box: Box = { x: 10, y: 20, w, h };
+        const ring = shapeOutline(shape, box);
+        assert.ok(ring.length >= 3, `${shape} ${String(w)}x${String(h)}`);
+        for (const point of ring) {
+          assert.ok(pointInBox(point, box, 1e-9), `${shape} ${String(w)}x${String(h)}: ${JSON.stringify(point)}`);
+        }
+        assert.ok(signedArea(ring) > 0);
+      }
+    }
+  });
+
   describe("degenerate boxes", () => {
     const boxes: ReadonlyArray<readonly [string, Box]> = [
       ["a point", { x: 5, y: 7, w: 0, h: 0 }],
@@ -389,6 +407,14 @@ describe("clipping to the outline (T-AC-1, T-AC-3)", () => {
         assert.equal(clipSegmentToOutline(P(0, 0), P(50, 0), shape, BOX), null);
         assert.equal(clipSegmentToOutline(P(300, 90), P(400, 90), shape, BOX), null);
         assert.equal(clipSegmentToOutline(P(0, 0), P(0, 0), shape, BOX), null);
+      });
+
+      it("a zero-length segment on the outline is the point itself", () => {
+        const ring = shapeOutline(shape, BOX);
+        const point = ring[1] as Point;
+        pointCloseTo(clipSegmentToOutline(point, point, shape, BOX), point);
+        const middle = P(((ring[0] as Point).x + point.x) / 2, ((ring[0] as Point).y + point.y) / 2);
+        pointCloseTo(clipSegmentToOutline(middle, middle, shape, BOX), middle);
       });
 
       it("returns the start when the segment starts on the outline", () => {
@@ -722,6 +748,7 @@ describe("segment crossings", () => {
     ["two zero-length segments", P(5, 5), P(5, 5), P(5, 5), P(5, 5), false],
     ["a shallow angle", P(0, 0), P(100, 0.001), P(50, -1), P(50, 1), true],
     ["almost touching: end 1e-12 short", P(0, 5), P(10, 5), P(5, 5 + 1e-12), P(5, 10), false],
+    ["end 1e-12 past: still a touch", P(0, 5), P(10, 5), P(5, 5 - 1e-12), P(5, 10), false],
     ["end 0.01 past", P(0, 5), P(10, 5), P(5, 4.99), P(5, 10), true],
   ];
   for (const [name, p, q, r, s, expected] of cases) {
