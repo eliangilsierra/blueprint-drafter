@@ -8,7 +8,13 @@
 // `import { spawn } from "node:child_process"` sees the stub too. The report lists every attempt, also those that
 // the calling code caught and swallowed.
 //
+// What is stubbed is derived, not listed by hand: every module of FORBIDDEN_MODULES (the lint deny-list of
+// eslint.config.core.js) except the reasoned RUNTIME_EXCEPTIONS, and every function of node:fs and
+// node:fs/promises except the read-only allow-lists below. Tests check both derivations.
+//
 // Scope and limits (documented residual risks of #59):
+// - A stubbed class is reachable unstubbed through its prototype (`net.Socket.prototype.constructor`) and through
+//   an instance created before the install (the standard streams). Residual risk 11, pinned in core-stubs.test.ts.
 // - Install the stubs before the code under test is first imported: a reference captured earlier is the original.
 // - The stubs cover this thread only. Code inside a worker thread (#21) runs without them.
 // - process.dlopen stays in place: native add-ons (@resvg/resvg-js) load through it, and native code is not

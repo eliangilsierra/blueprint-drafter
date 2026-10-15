@@ -17,6 +17,7 @@ import { Worker } from "node:worker_threads";
 
 import { isRecord, repositoryRoot } from "./helpers.js";
 import { compiledName, discoverSources } from "./support/core-files.js";
+import { type CorpusRun, exerciseCorpus } from "./support/corpus-guard.js";
 import {
   FORBIDDEN_MODULES,
   ForbiddenApiError,
@@ -443,74 +444,76 @@ function readCorpus(): ReadonlyArray<readonly [string, string]> {
     .map((file) => [file, readFileSync(join(directory, file), "utf8")] as const);
 }
 
-test("AC-44: the core entry points that can run on a corpus case attempt nothing forbidden", async (t) => {
-  const corpus = readCorpus();
-  assert.ok(corpus.length > 0, "bench/cases has no .bpd case");
-  const operations = readFileSync(join(repositoryRoot, "bench", "cases", "08-incremental.ops"), "utf8")
-    .split("\n")
-    .filter((line) => line.trim() !== "" && !line.startsWith("#"));
-  const exercised = new Set<string>();
-  const notes: string[] = [];
+const corpus = readCorpus();
+const operations = readFileSync(join(repositoryRoot, "bench", "cases", "08-incremental.ops"), "utf8")
+  .split("\n")
+  .filter((line) => line.trim() !== "" && !line.startsWith("#"));
 
+/** Import a module under the stubs and run its API on the corpus: guard (b), reused by its self-tests. */
+async function guardCorpus(moduleUrl: string): Promise<CorpusRun> {
+  let run: CorpusRun | undefined;
   const { calls, error } = await runUnderStubs(async () => {
-    const loaded: unknown = await import(pathToFileURL(compiledPath(join(sourceCore, "index.ts"))).href);
-    const api = isRecord(loaded) ? loaded : {};
-    // Calls a public function of API v1 (architecture section 7.1) when the core exports it already. An error
-    // other than a forbidden call is noted, not failed: this guard is about isolation, the module's own tests
-    // cover its behaviour.
-    const call = async (name: string, ...args: unknown[]): Promise<unknown> => {
-      const fn = api[name];
-      if (typeof fn !== "function") {
-        return undefined;
-      }
-      exercised.add(name);
-      try {
-        return await (fn as (...values: unknown[]) => unknown)(...args);
-      } catch (thrown: unknown) {
-        if (thrown instanceof ForbiddenApiError) {
-          throw thrown;
-        }
-        notes.push(`${name}: ${String(thrown)}`);
-        return undefined;
-      }
-    };
-    const field = (value: unknown, key: string): unknown => (isRecord(value) ? value[key] : undefined);
-    for (const [file, text] of corpus) {
-      const diagram = field(await call("parse", text), "diagram");
-      if (diagram === undefined) {
-        continue;
-      }
-      await call("serialize", diagram);
-      await call("show", diagram);
-      await call("diff", diagram, diagram);
-      if (file === "08-before.bpd") {
-        await call("applyOps", diagram, operations);
-      }
-      const checked = await call("check", diagram);
-      await call("formatDiagnostics", checked);
-      const layout = field(checked, "layout") ?? field(await call("layout", diagram), "layout");
-      if (layout === undefined) {
-        continue;
-      }
-      await call("validate", diagram, layout);
-      const svg = await call("renderSvg", layout);
-      if (typeof svg === "string") {
-        await call("toPng", svg);
-      }
-      for (const format of ["mermaid", "drawio", "excalidraw"]) {
-        await call("exportDiagram", diagram, layout, format);
-      }
-    }
+    const loaded: unknown = await import(moduleUrl);
+    run = await exerciseCorpus(isRecord(loaded) ? loaded : {}, corpus, operations);
   }, { workerCallers });
+  assertNoForbiddenCalls(calls, moduleUrl);
+  assert.equal(error, undefined, `the corpus run of ${moduleUrl} threw: ${String(error)}`);
+  assert.ok(run !== undefined);
+  assert.deepEqual(run.problems, [], `the corpus run of ${moduleUrl} does not count`);
+  return run;
+}
 
-  assertNoForbiddenCalls(calls, "the core entry points");
-  assert.equal(error, undefined, `the corpus run threw: ${String(error)}`);
-  if (exercised.size === 0) {
-    t.diagnostic(`no core function runs on a corpus case yet (src/core/index.ts exports constants only); ${corpus.length} cases are ready`);
+test("AC-44: the core entry points that can run on a corpus case attempt nothing forbidden", async (t) => {
+  assert.ok(corpus.length >= 9, "bench/cases has the nine corpus cases");
+  const run = await guardCorpus(pathToFileURL(compiledPath(join(sourceCore, "index.ts"))).href);
+  if (run.idle) {
+    t.diagnostic(`no core function runs on a corpus case yet (src/core/index.ts exports no function); ${corpus.length} cases are ready`);
   } else {
-    t.diagnostic(`exercised on ${corpus.length} corpus cases: ${[...exercised].sort().join(", ")}`);
+    t.diagnostic(`exercised on ${corpus.length} corpus cases: ${[...run.exercised].sort().join(", ")}`);
   }
-  for (const note of notes) {
-    t.diagnostic(`not an isolation finding: ${note}`);
-  }
+});
+
+// Self-tests of guard (b) (CR-5 of PR #61): it fails on a violating API and cannot pass without exercising one.
+const DIAGRAM = 'const diagram = { version: 1, type: "flow", nodes: [], edges: [], groups: [], constraints: [] };\n';
+const PURE_API = [
+  DIAGRAM,
+  "export const parse = () => ({ diagram, diagnostics: [] });",
+  'export const serialize = () => "flow\\n";',
+  "export const check = async () => ({ diagnostics: [], layout: { nodes: [] } });",
+  'export const renderSvg = () => "<svg/>";',
+  "",
+].join("\n");
+
+const CORPUS_SELF_TESTS: ReadonlyArray<readonly [string, string, RegExp]> = [
+  [
+    "an API whose parse starts a process fails the guard",
+    `import { spawnSync } from "node:child_process";\n${DIAGRAM}export const parse = () => { try { spawnSync(process.execPath, ["--version"]); } catch {} return { diagram, diagnostics: [] }; };\n`,
+    /used forbidden APIs: child_process\.spawnSync/,
+  ],
+  [
+    "an API whose check writes a file fails the guard",
+    `import { writeFileSync } from "node:fs";\n${DIAGRAM}export const parse = () => ({ diagram, diagnostics: [] });\nexport const check = async () => { writeFileSync(${JSON.stringify(join(scratch, "never-written.txt"))}, "x"); return { diagnostics: [] }; };\n`,
+    /used forbidden APIs: fs\.writeFileSync/,
+  ],
+  ["an API with functions but no parse fails instead of passing idle", "export const API_VERSION = 1;\nexport const helper = () => 1;\n", /exports functions \(helper\) but no parse/],
+  ["an API whose parse throws on a valid case fails", 'export const parse = () => { throw new TypeError("bad shape"); };\n', /parse threw on 01-flow\.bpd: TypeError: bad shape/],
+  ["an API whose parse returns no diagram fails", "export const parse = () => ({ diagnostics: [] });\n", /parse returned no diagram for 01-flow\.bpd/],
+];
+
+for (const [name, code, failure] of CORPUS_SELF_TESTS) {
+  test(`self-test of guard (b): ${name}`, async () => {
+    await assert.rejects(guardCorpus(writeFixture(code)), failure);
+  });
+}
+
+test("self-test of guard (b): an API with constants only passes idle, and says so", async () => {
+  const run = await guardCorpus(writeFixture("export const API_VERSION = 1;\nexport const FORMAT_VERSION = 1;\n"));
+  assert.equal(run.idle, true);
+  assert.deepEqual([...run.exercised], []);
+});
+
+test("self-test of guard (b): a pure API passes and every exported v1 function is exercised", async () => {
+  const run = await guardCorpus(writeFixture(PURE_API));
+  assert.equal(run.idle, false);
+  assert.deepEqual([...run.exercised].sort(), ["check", "parse", "renderSvg", "serialize"]);
 });
