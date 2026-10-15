@@ -5,8 +5,8 @@
 | Issue | #3 |
 | Requirements | #1 (FR-1 to FR-30, NFR-1 to NFR-13, AC-1 to AC-48) |
 | Research | #1, [research report](../research/1-llm-native-diagramming.md) and its [annex](../research/1-llm-native-diagramming/README.md) |
-| ADRs | [ADR-0001](../decisions/ADR-0001-local-first-typescript-core-with-thin-adapters.md) to [ADR-0005](../decisions/ADR-0005-apache-2-0-and-dependency-licence-policy.md) and [ADR-0006](../decisions/ADR-0006-name-binary-extension-and-header.md), [ADR-0007](../decisions/ADR-0007-one-npm-package-compiled-esm-node-22.md) (all Accepted) |
-| Status | In review |
+| ADRs | [ADR-0001](../decisions/ADR-0001-local-first-typescript-core-with-thin-adapters.md) to [ADR-0005](../decisions/ADR-0005-apache-2-0-and-dependency-licence-policy.md) and [ADR-0006](../decisions/ADR-0006-name-binary-extension-and-header.md), [ADR-0007](../decisions/ADR-0007-one-npm-package-compiled-esm-node-22.md) (all Accepted); [ADR-0008](../decisions/ADR-0008-complete-the-text-format-v1-contract.md) (Proposed, #56) |
+| Status | In review (open points of #56 resolved in place; format points in ADR-0008) |
 | Author | Architect agent |
 
 Names (ADR-0006, Accepted): the package and the CLI binary are both `blueprint-drafter`; diagram
@@ -32,7 +32,8 @@ ELK Layered for graph layout and a dedicated sequence engine, real font metrics,
 diagnostic catalogue and target profiles, an SVG renderer and PNG, Mermaid, draw.io and Excalidraw
 exporters. Thin adapters expose it: a CLI first, then an MCP server over stdio, an Agent Skill and a
 CI check, all shipped as one npm package. The key decisions are recorded in ADR-0001 to ADR-0007, all
-accepted by the owner, including naming (ADR-0006) and packaging (ADR-0007).
+accepted by the owner, including naming (ADR-0006) and packaging (ADR-0007); ADR-0008 (Proposed)
+completes the text format contract with the points left open by the first review (#56).
 
 ## 2. Requirements addressed
 
@@ -45,8 +46,8 @@ accepted by the owner, including naming (ADR-0006) and packaging (ADR-0007).
 | FR-5 | Sequence diagrams | yes: needs its own engine | `layout-sequence`, ADR-0002 |
 | FR-6 | Positions and sizes computed, never input | yes: format contract | `format` (no geometry attributes), `layout` |
 | FR-7 | Real font metrics, wrapping | yes: bundled font | `text`, ADR-0005 (OFL font) |
-| FR-8 | One canonical line-based format | yes: public contract | `format`, ADR-0003, §7.2 |
-| FR-9 | Operations `+ ~ -` by stable id | yes: public contract | `ops`, ADR-0003, §7.3 |
+| FR-8 | One canonical line-based format | yes: public contract | `format`, ADR-0003, ADR-0008, §7.2 |
+| FR-9 | Operations `+ ~ -` by stable id | yes: public contract | `ops`, ADR-0003, ADR-0008, §7.3 |
 | FR-10 | Atomic batches, report every failing op | yes: write semantics | `ops`, `io` atomic write |
 | FR-11 | Suggest the intended id | no | `ops` suggestion function |
 | FR-12 | Finding = code, ids, fix | yes: diagnostic contract | `model.Diagnostic`, §7.4 |
@@ -124,6 +125,13 @@ modules as follows:
 | `src/cli.ts`, `src/mcp.ts` | `cli`, `mcp` | Workspace check is a string prefix test without resolving symbolic links or case; uncaught errors exit with code 1, which collides with "diagram has errors" |
 | `bench/`, `test/`, `integrations/` | `bench/`, `test/`, Skill, CI action | Benchmark cases become the acceptance corpus (#1 A-3) |
 
+The archive is immutable evidence, not a supported tool. Its README, example hooks and workflows are
+inert as committed and must not be copied into active paths (`.github/`, `.claude/`, a client
+configuration). Anyone who runs the prototype for comparison installs it with
+`npm ci --ignore-scripts` (a plain `npm install` runs the vendor telemetry `postinstall` of
+`@ibm/plex-sans`) and binds its benchmark server to the loopback interface only, because that server
+exposes an unauthenticated write endpoint.
+
 ## 5. Context
 
 ```mermaid
@@ -158,7 +166,7 @@ Trust boundaries:
 | B2: MCP client into the MCP server | Tool calls with file paths and operations | Workspace confinement, extension allow-list, no delete tool (§7.6, §9) |
 | B3: exported files into viewers | Generated SVG, XML and JSON containing user text | Escaping, no script, no `foreignObject`, no external reference (NFR-7) |
 | B4: tool output into the agent's context | Labels and descriptions written by others | Skill and MCP instructions state that diagram content is data (FR-27) |
-| B5: third-party packages into the build | Runtime dependencies | Licence policy, exact pins for output-affecting packages, lockfile, notices test (ADR-0005) |
+| B5: third-party packages into the build | Runtime dependencies | Licence policy (ADR-0005), exact pins for every direct dependency, published `npm-shrinkwrap.json`, install-script allow-list, `npm audit` and signature checks, provenance and SBOM, notices test (§9 B5) |
 
 ## 6. Components
 
@@ -246,14 +254,14 @@ core module; the diagram draws the modules its pipelines call directly.
 | `limits` | new | Hold the configured input limits and check them before tokenizing and before layout | `Limits` | `model` |
 | `text` | new | Load the bundled font, measure text with real metrics, wrap and elide labels | Font files (read-only) | fontkit |
 | `theme` | new | Map kinds to semantic roles, shapes, colours, typography and density presets; light and dark themes | Theme tokens | `model` |
-| `layout` | new | Engine registry; size nodes from measured text; clip edge ends to real shape outlines; check constraints; enforce the time budget | `LayoutEngine` interface | `text`, `theme`, `layout-elk`, `layout-sequence` |
+| `layout` | new | Engine registry; size nodes from measured text; clip edge ends to real shape outlines; check constraints; enforce the time budget with the generic worker runner (`runInWorker`, `serveJobs`, §6.3) | `LayoutEngine` interface | `text`, `theme`, `layout-elk`, `layout-sequence` |
 | `layout-elk` | new | Build the ELK graph (hierarchy, labels, ports, constraints) and convert the result into a `Layout` | ELK option set | elkjs |
 | `layout-sequence` | new | Lay out participants, lifelines and ordered messages, including self-messages; column gaps come from measured message labels | none | `text` |
 | `validate` | new | Run geometric, legibility and composition rules on any `Layout` under a target profile; compute metrics | Rule registry, profiles | `model`, `theme` (contrast rule) |
 | `render` | new | Produce deterministic, accessible SVG with the font embedded | none | `text`, `theme` |
 | `export` | new | PNG through resvg-js; Mermaid, draw.io and Excalidraw text formats | none | `render`, resvg-js |
 | `io` | new | Resolve and confine file paths to a workspace, read files under the byte limit, write atomically, detect concurrent changes | Workspace policy | Node `fs` |
-| `api` | new | The public v1 facade: the only import path of the package; composes the modules into pipelines | API contract | all core modules |
+| `api` | new | The public v1 facade: the only import path of the package; composes the modules into pipelines; owns the production layout worker entry and its fixed handler (layout, then validation; §6.3) | API contract | all core modules |
 | `cli` | new (adapter) | Translate argv to `api` calls, format text or JSON output, map results to exit codes | none | `api` |
 | `mcp` | new (adapter) | Expose six typed tools over stdio that call `api` | none | `api`, MCP SDK and zod |
 | Agent Skill | new (integration) | Tell agents when and how to use the CLI or MCP, the edit loop, and that diagram content is data | `SKILL.md` | CLI, MCP |
@@ -270,7 +278,9 @@ tree is in §9 (B5).
 
 **Font (decision for WP-1):** the IBM Plex Sans Regular and SemiBold files (OFL-1.1) are **vendored**:
 committed unmodified under `fonts/` together with the OFL text, taken once from the official IBM Plex
-release, and pinned by SHA-256 in a test. The npm package `@ibm/plex-sans`, which the prototype used,
+release, and pinned by SHA-256 in a test. Their provenance (release `@ibm/plex-sans@1.1.0` of
+`IBM/plex`, asset `ibm-plex-sans.zip` with its SHA-256, the extracted files) is recorded in
+`THIRD_PARTY_NOTICES.md`, and `fonts/SHA256SUMS` is the list the test reads. The npm package `@ibm/plex-sans`, which the prototype used,
 is **neither a runtime nor a development dependency**: its `postinstall` script runs IBM's telemetry
 tool (`@ibm/telemetry-js`), which would break NFR-10 and the offline install. The published package
 ships the same files and never writes into its own installation directory.
@@ -321,12 +331,19 @@ sequenceDiagram
     else batch accepted
         API->>F: check element and label limits
         API->>L: layout within the time budget
-        L-->>API: Layout
-        API->>V: validate under the profile
-        V-->>API: diagnostics and metrics
-        API->>IO: write canonical text atomically if content hash unchanged
-        API-->>AD: changes, summary, problems
-        AD-->>A: ok lines, exit code 0 or 1
+        alt layout and validation complete
+            L-->>API: Layout
+            API->>V: validate under the profile
+            V-->>API: diagnostics and metrics
+            API->>IO: write canonical text atomically if content hash unchanged
+            API-->>AD: status ok or findings, changes, summary, problems
+            AD-->>A: ok lines and check line, exit code 0 or 1
+        else layout fails or exceeds the budget
+            L-->>API: E_LAYOUT_TIMEOUT or E_INTERNAL
+            API->>IO: write canonical text atomically if content hash unchanged
+            API-->>AD: status failed, written true, changes, the error
+            AD-->>A: ok lines then the error line, exit code 2 or isError
+        end
     end
 ```
 
@@ -346,7 +363,7 @@ Other pipelines reuse the same steps:
 | `c4-context`, `c4-container` | `layout-elk` with hierarchy, `TB` by default | Persons outside boundaries; technology shown as `[Container: tech]`; boundaries drawn dashed; relations labelled (`W_UNLABELED_RELATION` otherwise) |
 | `component` | `layout-elk`, `LR` by default | Dependencies inside a boundary and to external systems; `style=dep` uses an open arrowhead |
 | `architecture` | `layout-elk` with nested groups (`INCLUDE_CHILDREN`), `LR` by default | Groups of kinds `zone`, `cluster`, `layer`, `group`, `boundary`; edges cross group borders; `W_EDGE_DETOUR` flags grouping-induced detours |
-| `sequence` | `layout-sequence` | Participants are nodes in declaration order; messages are edges in declaration order, top to bottom; `style=reply` dashed, `style=async` open arrowhead; self-messages loop back to the same lifeline; groups and layout constraints are not allowed (`E_UNSUPPORTED_FOR_TYPE`) |
+| `sequence` | `layout-sequence`, direction `TB` by default and only (Proposed — owner confirms by merging; see below) | Participants are nodes in declaration order; messages are edges in declaration order, top to bottom; `style=reply` dashed, `style=async` open arrowhead; self-messages loop back to the same lifeline; groups and layout constraints are not allowed (`E_UNSUPPORTED_FOR_TYPE`) |
 
 Common to the ELK types: orthogonal routing; edge labels are ELK labels so their space is reserved
 (F-13); node size comes from measured text and the shape preset; ELK options are a fixed, versioned
@@ -361,11 +378,27 @@ ASSUMPTION to be confirmed by the constraint spike, work package 6). Independent
 `rank same`; increasing coordinate across the flow axis for `order`) and emits `I_CONSTRAINT_UNMET`
 naming the constraint when it does not hold.
 
+Sequence direction (#56; Proposed — owner confirms by merging): the sequence engine draws
+participants from left to right and messages from top to bottom only, so the default header `dir` of
+`sequence` is `TB` and the canonical form omits it. Any other header `dir` on a `sequence` diagram is
+`W_NOT_FOR_TYPE` with the fix `~diagram dir=TB`, and the diagram is still drawn top to bottom. The
+rejected alternative, no default and `dir` required or always written, keeps a value that has no
+effect in every sequence file and leaves the canonical form undefined.
+
 Time budget (NFR-9): layout (ELK or the sequence engine) and validation run in a `worker_threads`
 worker created with `resourceLimits` (heap ceiling `layoutWorkerHeapMb`, §9); one `layoutTimeoutMs`
 budget covers layout plus validation. When the budget expires the worker is terminated and the call
 fails with `E_LAYOUT_TIMEOUT`. Whether a single elkjs call can be bounded this way is an ASSUMPTION
 (research A-6) checked by the sizing spike. A worker thread is not a child process (NFR-8).
+
+Worker entry (#56, Q-W): under the core isolation rules (no computed `import()`, no code loaded by
+URL from job data), the worker runs a **static** entry module with a fixed handler. The generic runner
+(`runInWorker`, which starts the worker, enforces the budget and terminates it) and `serveJobs` (the
+worker-side loop) live in `layout`; the production entry and its handler (layout, then validation,
+returning the layout and diagnostics as data) live in `api` (`src/core/api/layout-job.ts`), because
+`layout` must not depend on `validate` and `api` may import every core module. The job input is data
+(diagram, options, profile), never a module URL. Rejected alternative: the entry in `layout`, which
+would add a `layout` → `validate` dependency the module graph of §6.1 does not have.
 
 #### Kinds and edge styles per diagram type
 
@@ -377,13 +410,14 @@ every diagram type. Admissible values:
 | Node kinds | `start`, `end`, `process`, `decision`, `io`, `subprocess` | `person`, `system`, `external` | `person`, `system`, `external`, `container`, `service`, `webapp`, `mobile`, `gateway`, `function`, `db`, `cache`, `storage`, `queue`, `topic` | `component`, `module`, `service`, `container`, `system`, `external`, `person`, `db`, `cache`, `storage`, `queue`, `topic` | every kind except the flow kinds and `actor`, `participant` | `actor`, `participant` |
 | Groups | any group kind | `boundary` | `boundary` | `boundary`, `layer`, `group` | any group kind | not allowed |
 | Edge `style` | `sync`, `async` | `sync`, `async`, `dep` | `sync`, `async`, `dep` | `sync`, `async`, `dep` | `sync`, `async`, `dep` | `sync`, `async`, `reply` |
+| Header `dir` | any | any | any | any | any | `TB` only (Proposed, owner) |
 | Edge `dir` | any | any | any | any | any | `fwd` only |
 | Constraints | allowed | allowed | allowed | allowed | allowed | not allowed |
 
 Violation policy:
 
-- A kind, group kind, style or edge `dir` that exists in the closed set but is not admissible for the
-  diagram type is a warning, `W_NOT_FOR_TYPE`, with the closest admissible value as fix; the element is
+- A kind, group kind, style, edge `dir` or header `dir` that exists in the closed set but is not
+  admissible for the diagram type is a warning, `W_NOT_FOR_TYPE`, with the closest admissible value as fix; the element is
   rendered with its usual shape. This keeps a `~diagram type=...` change possible without rewriting
   every element first.
 - A structure the engine cannot draw is an error, `E_UNSUPPORTED_FOR_TYPE`: groups or constraints in a
@@ -450,12 +484,17 @@ aspect). Each diagnostic carries `auto: true` when the engine resolves it itself
   (`light`, `dark`) and `density` (`compact`, `normal`, `airy`). Colours, sizes, fonts and coordinates
   are derived and cannot be set (FR-6). Roles: `actor`, `internal`, `data`, `messaging`, `external`,
   `flow`, `decision`, `terminal`; shapes: person, cylinder (data), pipe (queue, topic), hexagon
-  (gateway), diamond (decision), pill (start, end), rectangle otherwise.
+  (gateway), diamond (decision), pill (start, end), rectangle otherwise. The closed shape set of v1 is
+  `rect`, `pill`, `diamond`, `cylinder`, `pipe`, `person`, `hexagon`; `io` is a rectangle (the
+  prototype's parallelogram is not part of v1; adding a shape later is additive).
 - **Wrapping and elision (FR-7):** names wrap to at most 3 lines and descriptions to 4; beyond that the
   text is elided with an ellipsis and `W_TEXT_TRUNCATED` is reported (AC-9).
 - **SVG:** `role="img"`, `<title>` and `<desc>`, `data-id` on every element group, labels with a
   background halo drawn last; no `<script>`, no event attributes, no `foreignObject`, no external
-  `href` (NFR-7).
+  `href` (NFR-7). `renderSvg` receives only a `Layout`, so `layout` copies `type`, `title` and `theme`
+  from the diagram into it (§7.1). `<title>` is the diagram title, or the diagram type when there is
+  no title; `<desc>` is the fixed summary `<type> diagram: <n> nodes, <n> groups, <n> edges`; the
+  theme is `opts.theme` when given, else `layout.theme`.
 
 ### 6.6 Determinism rules (NFR-1)
 
@@ -492,8 +531,8 @@ emptyDiagram(type: DiagramType, opts?: { title?: string; dir?: Direction }): Dia
 applyOps(diagram: Diagram, ops: string[], opts?: { limits?: Partial<Limits> }): ApplyResult;
 //   ApplyResult = { ok: boolean; diagram: Diagram; changes: string[];
 //                   failures: OpFailure[]; introduced: Diagnostic[] }
-//   OpFailure  = { index: number; op: string; diagnostic: Diagnostic }
-show(diagram: Diagram, sel?: { around?: string; depth?: number; idsOnly?: boolean; stats?: boolean }): string;
+//   OpFailure  = { index: number; op: string; diagnostic: Diagnostic }   // index is 1-based (op#1)
+show(diagram: Diagram, sel?: ShowSelection): string;      // ShowSelection = { around?; depth?; idsOnly?; stats? }
 diff(a: Diagram, b: Diagram): DiffEntry[];                 // { change: '+' | '-' | '~'; kind; id; line; was? }
 
 // Layout, validation, rendering
@@ -501,31 +540,35 @@ layout(diagram: Diagram, opts?: LayoutOptions): Promise<LayoutResult>;     // { 
 validate(diagram: Diagram, layout: Layout, opts?: ValidateOptions): { diagnostics: Diagnostic[]; metrics: Metrics };
 check(diagram: Diagram, opts?: LayoutOptions & ValidateOptions): Promise<CheckResult>;
 //   CheckResult = { layout?: Layout; diagnostics: Diagnostic[]; metrics: Metrics; summary: Summary }
-renderSvg(layout: Layout, opts?: { theme?: Theme; embedFont?: boolean }): string;
-toPng(svg: string, opts?: { scale?: number }): Uint8Array;
+renderSvg(layout: Layout, opts?: { theme?: Theme; embedFont?: boolean }): string;   // theme defaults to layout.theme
+toPng(svg: string, opts?: { scale?: number; limits?: Partial<Limits> }): PngResult;  // { png?: Uint8Array; diagnostics }
 exportDiagram(diagram: Diagram, layout: Layout, format: 'mermaid' | 'drawio' | 'excalidraw'): string;
 formatDiagnostics(result: CheckResult | ApplyResult, opts?: { json?: boolean; max?: number }): string;
 
 // File pipelines: the ONLY functions the CLI and the MCP server call for file work, so both
 // adapters share one implementation of reading, limits, batch rejection, hashing and writing.
 // ws = null means no confinement (CLI without --workspace); the MCP server always passes a Workspace.
-newFile(ws: Workspace | null, path: string, opts: { type: DiagramType; title?: string; dir?: Direction }): Promise<FileResult>;
+// Every file pipeline takes limits?: Partial<Limits> in its options (one options bag, #56 CR-18).
+newFile(ws: Workspace | null, path: string,
+        opts: { type: DiagramType; title?: string; dir?: Direction; limits?: Partial<Limits> }): Promise<FileResult>;
 applyFile(ws: Workspace | null, path: string, ops: string[],
           opts?: { dryRun?: boolean; profile?: string; fit?: Size; limits?: Partial<Limits> }): Promise<ApplyFileResult>;
 checkPaths(ws: Workspace | null, paths: string[],
            opts?: { profile?: string; fit?: Size; limits?: Partial<Limits> }): Promise<CheckFilesResult>;
-showFile(ws: Workspace | null, path: string, sel?: ShowSelection): Promise<TextResult>;
-diffFiles(ws: Workspace | null, a: string, b: string): Promise<DiffFileResult>;
+showFile(ws: Workspace | null, path: string, sel?: ShowSelection & { limits?: Partial<Limits> }): Promise<TextResult>;
+diffFiles(ws: Workspace | null, a: string, b: string, opts?: { limits?: Partial<Limits> }): Promise<DiffFileResult>;
 renderFile(ws: Workspace | null, path: string,
-           opts: { format: 'svg' | 'png'; out?: string; theme?: Theme; scale?: number; embedFont?: boolean }): Promise<FileResult>;
+           opts: { format: 'svg' | 'png'; out?: string; theme?: Theme; scale?: number; embedFont?: boolean;
+                   limits?: Partial<Limits> }): Promise<FileResult>;
 exportFile(ws: Workspace | null, path: string,
-           opts: { format: 'mermaid' | 'drawio' | 'excalidraw'; out?: string }): Promise<ExportFileResult>; // no out: text returned
-formatPaths(ws: Workspace | null, paths: string[], opts?: { check?: boolean }): Promise<FormatResult>;
+           opts: { format: 'mermaid' | 'drawio' | 'excalidraw'; out?: string; limits?: Partial<Limits> }): Promise<ExportFileResult>; // no out: text returned
+formatPaths(ws: Workspace | null, paths: string[], opts?: { check?: boolean; limits?: Partial<Limits> }): Promise<FormatResult>;
 findDiagramFiles(ws: Workspace | null, paths: string[], limits?: Partial<Limits>): DiscoveryResult;
-//   Every *Result has { status: 'ok' | 'findings' | 'failed' | 'rejected'; diagnostics: Diagnostic[]; ... }.
-//   The CLI maps status to exit codes 0 / 1 / 2 / 3 (§7.5); the MCP server maps 'failed' and
-//   'rejected' to isError. ApplyFileResult adds changes, failures, introduced, written: boolean and the
-//   CheckResult of the written diagram; CheckFilesResult has one CheckResult per discovered file.
+//   Every file-pipeline result (FileResult, ApplyFileResult, CheckFilesResult, TextResult, DiffFileResult,
+//   ExportFileResult, FormatResult, DiscoveryResult) has { status: 'ok' | 'findings' | 'failed' |
+//   'rejected'; diagnostics: Diagnostic[]; ... }. ApplyResult, CheckResult, LayoutResult, PngResult,
+//   ReadResult and WriteResult have no status. The CLI maps status to exit codes 0 / 1 / 2 / 3 (§7.5);
+//   the MCP server maps 'failed' and 'rejected' to isError. Fields per result: types table below.
 
 // Low-level file access (used by the pipelines; exported for embedders)
 openWorkspace(root: string): Workspace;                   // realpath of an existing directory
@@ -541,13 +584,22 @@ Core types (field names are part of v1):
 
 | Type | Fields |
 | --- | --- |
-| `Diagram` | `version: 1`, `type`, `title?`, `dir: 'TB' \| 'LR' \| 'BT' \| 'RL'`, `theme: 'light' \| 'dark'`, `density: 'compact' \| 'normal' \| 'airy'`, `groups: Group[]`, `nodes: Node[]`, `edges: Edge[]`, `constraints: Constraint[]`, `comments` (leading comments per statement) |
-| `Group` | `id`, `kind` (`boundary`, `zone`, `cluster`, `layer`, `group`), `label`, `in?`, `desc?`, `tags?`, `meta?` |
-| `Node` | `id`, `kind`, `label`, `in?`, `tech?`, `desc?`, `tags?`, `meta?` |
-| `Edge` | `id`, `from`, `to`, `label?`, `tech?`, `style?: 'sync' \| 'async' \| 'reply' \| 'dep'`, `dir?: 'fwd' \| 'both' \| 'none'`, `explicitId: boolean`, `meta?` |
+| `Diagram` | `version: 1`, `type`, `title?`, `dir: 'TB' \| 'LR' \| 'BT' \| 'RL'`, `theme: 'light' \| 'dark'`, `density: 'compact' \| 'normal' \| 'airy'`, `groups: Group[]`, `nodes: Node[]`, `edges: Edge[]`, `constraints: Constraint[]`, `comments: DiagramComments` |
+| `DiagramComments` | `header: string[]` (above the header), `statements: Map<string, string[]>` (above a statement, keyed `group <id>`, `node <id>`, `edge <id>`, `rank same <ids>` or `order <ids>`, ids joined by `,`), `trailing: string[]` (after the last statement); one entry per comment line, the line without its leading blanks (it starts with `#`), written back as is. A `Map`, because `__proto__` is a valid id. An operation that changes a statement's key (reconnection, removal of an id from a constraint) moves its comments to the new key |
+| `Group` | `id`, `kind: string` (usually one of `GROUP_KINDS`), `label`, `in?`, `desc?`, `tags?: string[]`, `meta?: ReadonlyMap<string, string>` |
+| `Node` | `id`, `kind: string` (usually one of `NODE_KINDS`), `label`, `in?`, `tech?`, `desc?`, `tags?: string[]`, `meta?: ReadonlyMap<string, string>` |
+| `Edge` | `id`, `from`, `to`, `label?`, `tech?`, `style?: 'sync' \| 'async' \| 'reply' \| 'dep'` (absent means `sync`), `dir?: 'fwd' \| 'both' \| 'none'` (absent means `fwd`), `explicitId: boolean`, `meta?: ReadonlyMap<string, string>` |
+| Kinds and `meta` | `kind` is a `string` because an unknown kind is kept (`W_UNKNOWN_KIND`, §6.3); `isNodeKind` and `isGroupKind` tell the closed sets apart. `meta` is keyed without the `meta.` prefix; a `Map` because `__proto__`, `constructor` and `toString` are valid ids. A `Diagram` is therefore not JSON-serialisable as it is: the serialiser and any JSON output convert explicitly |
 | `Constraint` | `{ type: 'same-rank' \| 'order'; ids: string[] }` |
-| `Diagnostic` | `severity: 'error' \| 'warning' \| 'info'`, `code`, `ids: string[]`, `message`, `fix?`, `auto?: boolean`, `line?: number`, `op?: number` |
-| `Layout` | `width`, `height`, `engine`, `nodes[]` (`id`, `x`, `y`, `w`, `h`, `shape`, text lines and font sizes), `groups[]` (same plus title box), `edges[]` (`id`, `points[]`, `label` box, arrowheads) |
+| `Diagnostic` | `severity: 'error' \| 'warning' \| 'info'`, `code`, `ids: string[]`, `message`, `fix?`, `auto?: boolean`, `line?: number` (1-based), `op?: number` (1-based, the `n` of `op#n`) |
+| `Layout` | `width`, `height`, `engine`, `type`, `title?`, `theme` (copied from the diagram for `renderSvg`, §6.5), `nodes[]` (`id`, `x`, `y`, `w`, `h`, `shape`, text blocks with lines, widths and font sizes), `groups[]` (same plus title box), `edges[]` (`id`, `points[]`, `label` box, arrowheads), `lifelines?` (sequence: `id`, `x`, `y1`, `y2`) |
+| `SizedNode` (internal) | A node sized from measured text before placement: `id`, `w`, `h`, `shape`, text blocks, content box, `truncated` |
+| `LayoutOptions` / `ValidateOptions` | `{ limits?: { layoutTimeoutMs?; layoutWorkerHeapMb? } }` (`Partial<Limits>` is assignable; `model` cannot import `limits`) / `{ profile?: string; fit?: Size }` |
+| `Size` | `{ width, height }` in CSS pixels |
+| `ShowSelection` | `{ around?: string; depth?: number; idsOnly?: boolean; stats?: boolean }` |
+| `DiffEntry` | `change: '+' \| '-' \| '~'`, `kind: 'header' \| 'group' \| 'node' \| 'edge' \| 'constraint'`, `id` (`diagram` for the header; the canonical line for a constraint), `line: string` (the canonical line in `b`, or in `a` for `-`), `was?: string` (the canonical line in `a`, for `~`) |
+| `PngResult` | `{ png?: Uint8Array; diagnostics }` (`E_LIMIT_EXCEEDED` for `maxPngPixels` or `scale`, `E_INTERNAL` when the native binary cannot load) |
+| File-pipeline results | Each has `status` and `diagnostics`. `FileResult` (`newFile`, `renderFile`): `path?`, `size?: Size`. `ApplyFileResult`: `changes`, `failures`, `introduced`, `written: boolean`, `check?: CheckResult`. `CheckFilesResult`: `files: { file, profile, check: CheckResult }[]` in discovery order. `TextResult`: `text?`. `DiffFileResult`: `entries: DiffEntry[]`. `ExportFileResult`: `text?`, `path?`. `FormatResult`: `files: string[]` (rewritten, or not canonical with `check`). `DiscoveryResult`: `files: string[]` sorted by code point |
 | `Limits` | see §9 |
 | `TargetProfile` | `name`, `fitWidth`, `fitHeight \| null`, `minTextPx` |
 | `Metrics` | `nodes`, `groups`, `edges`, `crossings`, `width`, `height`, `minTextPx` (smallest effective text size under the profile), `detours`, `endpointGaps`, `aspect`, `errors`, `warnings`, `infos` |
@@ -570,7 +622,9 @@ operation language, the CLI commands, options, output line shapes and exit codes
 the diagnostic **codes** of the syntax, operation, file, limit and semantic classes plus the
 error-level geometric codes. Not frozen within v1, and documented as such in the API reference:
 threshold values, profile canvases, limit defaults, message wording, and the severity of heuristic
-`W_` and `I_` codes, which calibration (Q-5) may change in a minor release.
+`W_` and `I_` codes, which calibration (Q-5) may change in a minor release. The quoting rule of §7.4
+(what a message, a fix and an output path may contain) is a security property, not wording: it is
+frozen and outside that latitude.
 
 - **Errors:** every input problem is a `Diagnostic` with a catalogue code (§7.4).
 - **Idempotency:** `parse` then `serialize` is idempotent; read functions never modify their inputs.
@@ -594,15 +648,23 @@ node        = "node" , ID , NODE-KIND , STRING , { attr } ;       (* attr: in te
 edge        = "edge" , EDGE-REF , [ STRING ] , { attr } ;          (* attr: id tech style dir meta.* *)
 constraint  = ( "rank" , "same" | "order" ) , ID , "," , ID , { "," , ID } ;
 attr        = KEY , "=" , value ;
-value       = WORD | STRING ;
+value       = WORD | STRING ;                                     (* '""' is the empty value *)
 EDGE-REF    = ID , ">" , ID , [ "#" , INT ] ;
-ID          = letter-or-underscore , { letter | digit | "_" | "." | "-" } ;   (* at most 64 chars *)
+ID          = ( letter | "_" ) , { letter | digit | "_" | "." | "-" } ;   (* length: limit maxIdChars, §9 *)
 KEY         = known-key | "meta." , ID ;
 WORD        = 1*( letter | digit | "_" | "." | ":" | "/" | "," | "+" | "-" ) ;
 STRING      = '"' , { char-except-quote-backslash-control | '\"' | '\\' | '\n' } , '"' ;
-comment-line = { " " | "\t" } , "#" , { any-char } ;
+comment-line = { " " | "\t" } , "#" , { any-char } ;              (* rejected characters apply *)
+letter      = "A" .. "Z" | "a" .. "z" ;                           (* ASCII only (ADR-0008) *)
+digit       = "0" .. "9" ;
+INT         = ( "1" .. "9" ) , { digit } ;                        (* no leading zero; 2 or more in EDGE-REF *)
 VERSION     = "1" ;
 ```
+
+`ID`, `WORD` and `KEY` are ASCII (ADR-0008): any other text is written as a quoted `STRING`, which the
+serialiser does by itself. The rejected alternative, Unicode letters, would let two ids that look the
+same differ (composed and decomposed accents, homoglyphs) and would need a normalisation rule; relaxing
+to Unicode later is additive.
 
 Closed value sets:
 
@@ -611,14 +673,18 @@ Closed value sets:
 | `type` | `flow`, `c4-context`, `c4-container`, `component`, `architecture`, `sequence` |
 | `NODE-KIND` | `start`, `end`, `process`, `decision`, `io`, `subprocess`, `person`, `system`, `external`, `container`, `service`, `component`, `webapp`, `mobile`, `gateway`, `function`, `db`, `cache`, `storage`, `queue`, `topic`, `module`, `actor`, `participant` |
 | `GROUP-KIND` | `boundary`, `zone`, `cluster`, `layer`, `group` |
-| `dir` (header) | `TB`, `LR`, `BT`, `RL` (default per type, §6.3) |
-| `theme` / `density` | `light`, `dark` / `compact`, `normal`, `airy` |
+| `dir` (header) | `TB`, `LR`, `BT`, `RL` (default per type, §6.3; `TB` for `sequence`, Proposed) |
+| `theme` / `density` | `light` (default), `dark` / `compact`, `normal` (default), `airy` |
 | `style` / `dir` (edge) | `sync` (default), `async`, `reply`, `dep` / `fwd` (default), `both`, `none` |
 
 Rules:
 
 - **Ids** are case-sensitive and unique across groups, nodes and edges. The engine never changes an
-  author-chosen id.
+  author-chosen id. A value in an id position (statement id, `in=`, `id=`, an edge endpoint, a
+  constraint id, `from=`, `to=`) that does not match `ID` is `E_BAD_ID`. Length is a limit, not part
+  of the pattern: an id longer than `maxIdChars` is `E_LIMIT_EXCEEDED` (limit `maxIdChars`), checked
+  after parsing and before layout (§9 B1), and never `E_BAD_ID`. Reason: limit values are configurable
+  and not frozen (§7.1), so a fixed length in the frozen pattern would contradict a configured limit.
 - **Edge ids are stable once assigned (FR-9, AC-11).** An edge has either an explicit id (`id=x`,
   kept across reconnections) or a derived id of the form `from>to` or `from>to#n` (n ≥ 2). The derived
   id is assigned **once**, when the edge is added (`+edge a>b` takes `a>b` if free, else the lowest
@@ -629,6 +695,14 @@ Rules:
   (`(was a>b#2)`). Within a batch, every operation refers to ids as they are after the earlier
   operations of the same batch. The reference `a>b#n` in a file must be consistent with the edge's
   endpoints and unique (`E_DUPLICATE_ID` otherwise); `#1` is not used.
+- **Repeated bare references in a file (#56 CR-20, ADR-0008).** `parse` assigns edge ids in two
+  passes: first every explicit `id=` and every written `a>b#n` reference is taken as written; then
+  every edge written as a bare `a>b` without `id=` gets, in file order, `a>b` if free, else the lowest
+  free `a>b#n`, the same rule as `+edge`. So two lines `edge a>b` are two parallel edges `a>b` and
+  `a>b#2` (repeated messages in a sequence diagram are normal), and the canonical form writes the
+  second as `edge a>b#2`. `E_DUPLICATE_ID` remains only for an explicit id or a written `#n` reference
+  that is already taken. Rejected alternative: `E_DUPLICATE_ID` for the second bare line, which makes a
+  hand-written file fail where `+edge` succeeds.
 - **Containment:** `in=` must name a group; containment cannot form a cycle; nesting depth is limited.
 - **Edges** may connect nodes or groups.
 - **No geometry or style input (FR-6, #1 A-9):** any attribute key that is not in the known set for the
@@ -642,18 +716,58 @@ Rules:
   (`W_NOT_FOR_TYPE`, `E_UNSUPPORTED_FOR_TYPE`, `W_UNKNOWN_KIND`, `E_BAD_VALUE`), is in §6.3. An
   unknown kind is `W_UNKNOWN_KIND` with the closest kind as fix and is rendered with the generic shape.
   **Unknown statement keyword:** `E_UNKNOWN_STATEMENT` (blocking).
+- **Tags (#56, ADR-0008):** `tags` holds a set of opaque user tags, written as one value with the
+  tags separated by `,` (`tags=api,public`; the quoted form `tags="api,public"` is read the same way).
+  Each tag matches `1*( letter | digit | "_" | "." | ":" | "/" | "+" | "-" )`; an empty tag or any
+  other character is `E_BAD_VALUE`. Duplicates are dropped; the serialiser writes the tags sorted by
+  code point as a bare word. Like `meta.*`, tags are never used for layout or rendering in v1. The
+  model holds `tags?: string[]`.
+- **Empty values (#56, ADR-0008):** the empty value is the empty quoted string `""`; a bare `key=`
+  without a value is `E_SYNTAX` with the fix `key=""`. On a file line or an add operation, `""` for an
+  optional attribute or the optional edge label means the same as not writing it (the canonical form
+  drops it); in an update it clears the value (§7.3). `""` for a required value (`type`, a kind, the
+  label of a node or group, an edge `id`) is `E_BAD_VALUE`. Rejected alternative: a new bare empty
+  value `key=`, which changes the grammar of `value` and is easy to produce by accident (a missing
+  word).
 - **Comments:** a line whose first non-blank character is `#` is a comment. Comments directly above a
   statement are attached to it and move with it in canonical order; removing the statement removes
   them; comments after the last statement stay at the end. A `#` elsewhere outside a string is a syntax
-  error, except inside an edge reference.
-- **Strings:** only `\"`, `\\` and `\n` escapes. Rejected with `E_SYNTAX` and a specific message: C0
-  and C1 control characters, bidirectional controls (U+202A to U+202E, U+2066 to U+2069), zero-width
-  characters (U+200B to U+200D, U+FEFF inside a line), Unicode noncharacters and unpaired surrogates.
+  error, except inside an edge reference. The canonical form writes a comment line without its leading
+  blanks.
+- **Strings:** only `\"`, `\\` and `\n` escapes.
+- **Rejected characters (#56 SR-1, SR-12 and item 9, ADR-0008):** the rule applies to the **whole
+  text** of a file and of every operation, wherever the character appears: header, statements, bare
+  words, quoted strings, `meta.*` values and comment lines. A line that contains one of these
+  characters is rejected with `E_SYNTAX`, naming the line (or the operation) and the class of the
+  character, never echoing the text:
+
+  | Class | Characters | Exemption |
+  | --- | --- | --- |
+  | Control characters (`Cc`) | U+0000 to U+001F, U+007F to U+009F | LF as the line end; CR only directly before LF; TAB outside quoted strings (as whitespace, including inside a comment) |
+  | Line and paragraph separators (`Zl`, `Zp`) | U+2028, U+2029 | none |
+  | Bidirectional controls (`Bidi_Control`) | U+061C, U+200E, U+200F, U+202A to U+202E, U+2066 to U+2069 | none |
+  | Invisible characters (`Default_Ignorable_Code_Point`) | among others U+00AD, U+034F, U+115F, U+1160, U+17B4, U+17B5, U+180B to U+180F, U+200B to U+200F, U+2060 to U+206F, U+3164, U+FE00 to U+FE0F, U+FEFF, U+FFA0, U+E0000 to U+E0FFF | U+FEFF as the first character of a file (byte-order mark, dropped) |
+  | Noncharacters (`Noncharacter_Code_Point`) | U+FDD0 to U+FDEF and the last two code points of every plane | none |
+  | Unpaired surrogates (`Cs`) | U+D800 to U+DFFF not in a valid pair (operations passed as strings) | none |
+
+  The classes are Unicode properties, so the check is one property test per character with no
+  backtracking. This rejects the zero-width joiner and non-joiner (needed by some scripts such as
+  Persian) and variation selectors (emoji presentation): an accepted v1 limitation (§20; Proposed —
+  owner confirms by merging), because a context rule for them adds tokenizer complexity and its own
+  spoofing cases; allowing more characters later is additive. Rejected alternative: the rule for
+  strings only, which leaves a bidirectional control in a comment to reorder a pull request diff,
+  since comments are kept and re-emitted.
+- **Defaults and canonical omission (#56 CR-2, ADR-0008):** the defaults are the header `dir` of the
+  diagram's current type (§6.3), `theme=light`, `density=normal`, edge `style=sync` and edge `dir=fwd`.
+  A value equal to its default and an absent value are the same model value: the parser may store
+  either, the serialiser writes neither, and `diff` reports no change between them. Changing `type`
+  keeps the stored `dir`, so it is written when it differs from the new type's default.
 - **Canonical serialisation (FR-8, AC-10):** header with attributes in the order `type`, `dir`,
   `theme`, `density`, `title`, omitting defaults; then groups from outer to inner, siblings in model
   order; then nodes in model order; then edges in model order; then constraints. Attributes follow the
-  order of the grammar comments above, then `meta.*` sorted. Values are bare words when they match
-  `WORD`, quoted otherwise. Blank lines are not emitted.
+  order of the grammar comments above, then `meta.*` sorted; defaults and empty values are never
+  written. Values are bare words when they match `WORD`, quoted otherwise. Blank lines are not
+  emitted.
 - **Versioning:** a header version higher than supported fails with `E_VERSION_UNSUPPORTED`. v1 only
   adds statements, attributes, kinds and codes; a breaking change requires v2 and a migrator.
 
@@ -696,12 +810,25 @@ remove        = "-" , ( [ "node" | "group" | "edge" ] , ( EDGE-REF | ID )
   line or an add operation they are rejected with `E_UNKNOWN_ATTR` and the fix "the label is
   positional".
 - `from=` and `to=` exist only in `edge-update` and reconnect the edge (§7.2, edge ids).
-- An empty value (`key=`) clears an optional attribute; clearing `kind` or `label` is `E_BAD_VALUE`.
+- **Clearing (#56, ADR-0008):** in an update, the empty value `""` clears an optional attribute
+  (`in`, `tech`, `desc`, `tags`, `meta.<key>`, header `title`) or resets an attribute with a default
+  to it (header `dir`, `theme`, `density`; edge `style`, `dir`). The edge label is optional, so
+  `~edge a>b ""` and `~edge a>b label=""` remove it (#56 CR-21). Clearing a required value is
+  `E_BAD_VALUE`: `kind=""`, the label of a node or group (`~node api ""`, `label=""`), header
+  `type=""` and edge `id=""`. A bare `key=` is `E_SYNTAX` with the fix `key=""`.
 - `edge-update` and `remove` accept an explicit edge id as a bare `ID`.
+- **Keyword or bare id after `-` (#56 CR-21, ADR-0008):** ids are not reserved, so a group may be
+  called `edge` (corpus case 4). After `-`, the words `node`, `group`, `edge`, `rank` and `order` are
+  read as the keyword of the typed form **only when another token follows on the line**; a line with
+  one token after `-` is the bare form. So `-edge` removes the element with the id `edge`,
+  `-edge gw>auth` removes that edge, and `-group edge` removes the group `edge`. The typed form is
+  preferred in documentation. Rejected alternative: reserving the keywords as ids, which would make a
+  valid corpus file invalid and needs a rename for no gain in safety (the rule above has no ambiguous
+  case).
 
 | Operation | Form | Effect | Failure codes |
 | --- | --- | --- | --- |
-| Add | `+group ...`, `+node ...`, `+edge ...`, `+rank same ...`, `+order ...` | Appends the element or constraint in model order; a new edge gets its id per §7.2 | `E_DUPLICATE_ID` (fix: `~node id ...`), syntax codes |
+| Add | `+group ...`, `+node ...`, `+edge ...`, `+rank same ...`, `+order ...` | Appends the element or constraint in model order; a new edge gets its id per §7.2 | `E_DUPLICATE_ID` (fix: `~node <id> ...` or `~group <id> ...`; for an edge, drop `#n` or choose another `id=`), syntax codes |
 | Update | `~node ID [KIND] ["Label"] {attr}`, `~group ID [KIND] ["Label"] {attr}`, `~edge REF ["label"] {attr} [from=ID] [to=ID]`, `~diagram {header-attr}` | Changes only the given fields; a reconnection gives an edge with a derived id a new derived id, an explicit id is kept | `E_UNKNOWN_ID` (fix: closest id or `+node`), `E_BAD_VALUE`, `E_UNKNOWN_ATTR` |
 | Remove | `-node ID`, `-group ID`, `-edge REF`, `-ID`, `-rank same ID,...`, `-order ID,...` | Removes the element; removing a node removes its edges and its ids from constraints (constraints left with fewer than two ids are dropped); removing a group re-parents its children to the group's parent; other edges keep their ids | `E_UNKNOWN_ID`, `E_UNKNOWN_CONSTRAINT` |
 
@@ -720,7 +847,12 @@ Batch rules (FR-10, AC-12):
    (CLI exit code 1 when any is an error). A layout that fails or exceeds the time budget after an
    accepted batch does not reject it either: the batch is written (it is semantically valid, and an
    edit that splits an oversized diagram must remain possible) and `E_LAYOUT_TIMEOUT` or `E_INTERNAL`
-   is returned as a problem with status `failed` (CLI exit code 2).
+   is returned as a problem with status `failed` (CLI exit code 2). What the caller sees (#56 CR-19):
+   the result has `written: true` and the `changes`; the CLI text is the accepted output
+   (`ok <n> change(s)` and the changes) with the `check:` line replaced by the error finding line, so
+   its first line says that the batch was applied; the MCP result is `isError: true` with the first
+   line `<CODE> <message>` (§7.6) followed by the same text. The fix of the error says that the batch
+   was written and must not be re-applied.
 6. Unknown ids get a suggestion: the closest existing id by edit distance, within a distance bound and
    computed over at most the configured element limit (AC-13).
 7. A batch larger than `maxOpsPerBatch` is rejected with `E_LIMIT_EXCEEDED` before any operation runs.
@@ -730,7 +862,7 @@ operations, so every failure is listed and nothing is written; untrusted text in
 and truncated per §7.4):
 
 ```text
-$ blueprint-drafter apply ride.bpd '~node trps "Trips"' '~edge pricing>maps to=geo label="cached ETA"' '-node notfy'
+$ npx --yes blueprint-drafter@<x.y.z> apply ride.bpd '~node trps "Trips"' '~edge pricing>maps to=geo label="cached ETA"' '-node notfy'
 REJECTED E_UNKNOWN_ID op#1 "~node trps": no node "trps" | fix: did you mean "trips"?
 REJECTED E_UNKNOWN_ID op#3 "-node notfy": no node "notfy" | fix: did you mean "notify"?
 no changes written
@@ -741,34 +873,67 @@ no changes written
 Text form, one line per finding: `<S> <CODE> <ids> — <message> | fix: <fix>`, where `<S>` is `E`, `W`
 or `I`, preceded by a summary line
 `check: <n>E <n>W <n>I · nodes=<n> edges=<n> crossings=<n> size=<w>x<h> profile=<name>`. JSON form is
-the `Diagnostic` type (§7.1); the JSON `diagnostics` array lists every severity, the text form omits
-info findings unless `--max` leaves room. The catalogue is a closed list in v1 (new codes may be
-added; see the contract scope in §7.1).
+the `Diagnostic` type (§7.1); the JSON `diagnostics` array lists every severity. The catalogue is a
+closed list in v1 (new codes may be added; see the contract scope in §7.1).
+
+Exact line shapes (#56, frozen in v1 with the rest of the output, §7.1):
+
+- **Separators:** the dash is U+2014 with one space on each side; the `| fix: <fix>` part (with one
+  space before it) is present only when the finding has a fix.
+- **`<ids>`:** the ids joined by `,` without spaces (an `ID` cannot contain `,`, so the list is
+  unambiguous; the same separator as constraints). A finding without ids omits `<ids>` and its space:
+  `E E_LAYOUT_TIMEOUT — <message>`.
+- **Which findings are listed:** findings are listed in the order of §6.6 (severity, then code, then
+  ids), at most `--max` finding lines (default 20; the summary line does not count). Errors and
+  warnings come first; info findings are listed only when the error and warning lines leave room
+  under `--max`. The summary line always gives the full counts. (§7.5 describes the same rule.)
+- **Rejected batch:** one line per failing operation,
+  `REJECTED <CODE> op#<n> "<op>": <message> | fix: <fix>`, where `<n>` is the 1-based position in the
+  batch (the `op` field and `OpFailure.index`) and `"<op>"` is the operation's keyword and reference
+  quoted per the rule below. A batch-level rejection without an operation index is
+  `REJECTED <CODE> — <message> | fix: <fix>`: `E_LIMIT_EXCEEDED` for `maxOpsPerBatch` or `maxOpsBytes`,
+  and `E_BATCH_INTRODUCES_ERRORS`, which is followed by one finding line per introduced diagnostic.
+  The output ends with `no changes written`.
 
 Untrusted text in messages: a message quotes at most the offending
 token, id or operation, never a whole file line; an operation is quoted by its keyword and reference
 only (for example `"~node trps"`), without its label or attributes; every such fragment is written with the string
-escapes of §7.2, stripped of control, bidirectional and zero-width characters, and truncated to 80
-characters with an ellipsis. Labels and descriptions are never echoed in messages.
+escapes of §7.2 (a line feed as `\n`), stripped of the characters below, and truncated to 80 UTF-16
+code units after escaping (ellipsis included, quotes excluded). Labels and descriptions are never
+echoed in messages. The same stripping applies to `ids` and `fix`. Stripped classes: `Cc`, `Cf`,
+`Zl`, `Zp`, `Cs`, `Noncharacter_Code_Point` and `Default_Ignorable_Code_Point` (#56 item 9; a
+superset of the rejected characters of §7.2, so a fragment of a rejected line cannot carry them
+either).
+
+File paths (#56 SR-2): a message never contains a path; the file a finding concerns is the `file` of
+its result (the "path" location of the file codes below means that). Every output path is written
+relative to the workspace root (or to the current directory without a workspace) with `/` as the
+separator. In the text form (`created <file>`, `wrote <out>`, `formatted <file>`, the `file=` field of
+the per-file `check:` line in §7.5) a path is a bare word when it matches `WORD`, otherwise it is
+quoted with the string escapes of §7.2 and stripped of the classes above; paths are not truncated. In
+JSON the `file` field holds the exact path, and JSON output is ASCII only: every non-ASCII character
+is written as a `\uXXXX` escape (and control characters as JSON escapes), so the JSON stays lossless
+while a path or message cannot put a raw control, bidirectional or invisible character into a log. Rejected alternative: echoing paths raw, which lets a file name with a line feed or a
+bidirectional control forge a finding line in a CI log or an agent's context.
 
 **Syntax, operations, files and limits** (when one of these occurs in a command, the command does
 not complete its normal output; nothing is written except in the case of rule 5 of §7.3):
 
 | Code | Severity | Trigger | ids / location | Fix |
 | --- | --- | --- | --- | --- |
-| `E_SYNTAX` | error | Unexpected token, unterminated string, bad escape, control character, malformed edge reference, inline `#` | line or op index | Example of the expected statement |
+| `E_SYNTAX` | error | Unexpected token, unterminated string, bad escape, rejected character anywhere in the line (§7.2), bare `key=` without a value, malformed edge reference, inline `#` | line or op index | Example of the expected statement; `key=""` for a bare `key=` |
 | `E_MISSING_HEADER` | error | First statement is not the header | line | `diagram 1 type=...` |
 | `E_VERSION_UNSUPPORTED` | error | Header version higher than supported | line | Upgrade the tool |
 | `E_UNKNOWN_STATEMENT` | error | Unknown keyword | line | List of keywords |
-| `E_UNKNOWN_ATTR` | error | Attribute key not allowed for the statement (including geometry or style keys) | line, element id | Closest key, or `meta.<key>` |
-| `E_BAD_VALUE` | error | Value outside the closed sets of `type`, header `dir`, `theme`, `density`, edge `style` or edge `dir`; empty required value (kinds are never `E_BAD_VALUE`, §6.3) | line, element id | Valid values |
+| `E_UNKNOWN_ATTR` | error | Attribute key not allowed for the statement (including geometry or style keys; `label=` or `kind=` outside an update) | line, element id | Closest key, or `meta.<key>`; for `label=` and `kind=` outside an update: "the label is positional" or "the kind is positional" |
+| `E_BAD_VALUE` | error | Value outside the closed sets of `type`, header `dir`, `theme`, `density`, edge `style` or edge `dir`; empty value `""` for a required value (§7.2, §7.3); an empty or invalid tag (kinds are never `E_BAD_VALUE`, §6.3) | line, element id | Valid values |
 | `E_INVALID_OP` | error | Operation without `+`, `~` or `-`, or not allowed (for example `+diagram`) | op index | Correct form |
 | `E_UNKNOWN_ID` | error | `~` or `-` on an id that does not exist | op index, id | Closest id or `+node` |
-| `E_DUPLICATE_ID` | error | `+` with an existing id; duplicate id in a file | op index or line, id | `~node <id> ...` |
+| `E_DUPLICATE_ID` | error | `+` with an existing id; duplicate id in a file (for edges: an explicit `id=` or a written `a>b#n` that is taken; a repeated bare `a>b` is not a duplicate, §7.2) | op index or line, id | `~node <id> ...` or `~group <id> ...`; for an edge: drop `#n` (a free id is assigned) or choose another `id=` |
 | `E_UNKNOWN_CONSTRAINT` | error | `-rank same` or `-order` that matches no constraint | op index | Existing constraints |
 | `E_BATCH_INTRODUCES_ERRORS` | error | The batch would add semantic errors | introduced diagnostics | Per introduced diagnostic |
-| `E_LIMIT_EXCEEDED` | error | A limit of §9 exceeded (bytes, line length, elements, label length, id length, depth, ops, ops bytes, files, PNG pixels) | limit name, value, maximum | Split the diagram into views |
-| `E_LAYOUT_TIMEOUT` | error | Layout and validation exceeded the time budget or the worker heap limit | — | Split the diagram into views |
+| `E_LIMIT_EXCEEDED` | error | A limit of §9 exceeded (bytes, line length, elements, label length, id length (`maxIdChars`; never `E_BAD_ID`), depth, ops, ops bytes, files, PNG pixels or scale) | limit name, value, maximum | Split the diagram into views |
+| `E_LAYOUT_TIMEOUT` | error | Layout and validation exceeded the time budget or the worker heap limit | — | Split the diagram into views; after an accepted batch, also that the batch was written (§7.3 rule 5) |
 | `E_UNKNOWN_PROFILE` | error | Profile name not in `doc`, `slide`, `print` | — | Valid names |
 | `E_FILE_NOT_FOUND` | error | Input file missing or unreadable | path | — |
 | `E_NOT_REGULAR_FILE` | error | Path is a symbolic link, directory where a file is expected, device, FIFO or other non-regular file | path | Pass a regular file |
@@ -782,7 +947,7 @@ not complete its normal output; nothing is written except in the case of rule 5 
 
 | Code | Severity | Trigger | Fix |
 | --- | --- | --- | --- |
-| `E_BAD_ID` | error | Id does not match the id pattern | Valid id |
+| `E_BAD_ID` | error | A value in an id position does not match the `ID` pattern (ASCII, §7.2); length is `E_LIMIT_EXCEEDED` | Valid id |
 | `E_UNKNOWN_PARENT` | error | `in=` names no element | Closest group or `+group` |
 | `E_PARENT_NOT_GROUP` | error | `in=` names a node | Use a group |
 | `E_CONTAINMENT_CYCLE` | error | Groups contain each other | Break the cycle |
@@ -791,7 +956,7 @@ not complete its normal output; nothing is written except in the case of rule 5 
 | `E_CONSTRAINT_CONFLICT` | error | One id in two `rank same` constraints, or contradictory `order` | Remove one |
 | `E_UNSUPPORTED_FOR_TYPE` | error | Construct not allowed for the diagram type (groups or constraints in `sequence`) | Remove it or change `type` |
 | `W_UNKNOWN_KIND` | warning | Kind not in the closed set | Closest kind |
-| `W_NOT_FOR_TYPE` | warning | Kind, group kind, edge style or edge `dir` not admissible for the diagram type (§6.3) | Closest admissible value or `~diagram type=...` |
+| `W_NOT_FOR_TYPE` | warning | Kind, group kind, edge style, edge `dir` or header `dir` not admissible for the diagram type (§6.3) | Closest admissible value or `~diagram type=...` |
 | `W_UNLABELED_RELATION` | warning | C4 relation without a label | `~edge <ref> "label"` |
 | `W_C4_PERSON_IN_BOUNDARY` | warning | A person inside a system boundary | Move it out |
 | `W_C4_LEVEL_MIX` | warning | Components mixed with containers of another system | Split views |
@@ -800,33 +965,36 @@ not complete its normal output; nothing is written except in the case of rule 5 
 
 **Geometric, legibility and composition** (on the layout):
 
-| Code | Severity | Rule | Exceptions | AC |
-| --- | --- | --- | --- | --- |
-| `E_NODE_OVERLAP` | error | Boxes of unrelated elements intersect | Parent and child | AC-15 |
-| `E_OUTSIDE_PARENT` | error | Child outside its group | — | AC-4 |
-| `E_TEXT_OVERFLOW` | error | A text line wider than the content box, or content outside a non-rectangular shape | — | AC-16 |
-| `E_EDGE_THROUGH_NODE` | error | An edge segment crosses an unrelated leaf node | Source, target and their ancestors | AC-17, AC-18 |
-| `E_EDGE_ENDPOINT_GAP` | error | An edge end lies more than 2 px from the real outline of its shape (4 px on curves) | Sequence: distance to the lifeline | AC-1, AC-19 |
-| `E_EDGE_UNROUTED` | error | The engine returned no route for an edge | — | — |
-| `E_LABEL_OVERLAPS_NODE` | error | A label over a leaf node or over the title of an unrelated group | — | AC-20 |
-| `E_LABEL_OVERLAPS_LABEL` | error | Two labels overlap | — | — |
-| `E_LABEL_OVERLAPS_EDGE` | error | A label is crossed by a connector other than its own (FR-15) | The label's own connector | AC-20 (node case only; see §20) |
-| `W_NODES_TOO_CLOSE` | warning | Gap under 12 px between leaves | — | — |
-| `W_TEXT_TRUNCATED` | warning | Text was elided | — | AC-9 |
-| `W_EDGE_THROUGH_GROUP` | warning | Edge crosses a group containing neither end | Ancestor groups of an end | AC-18 |
-| `W_ARROW_TOO_SHORT` | warning | Last segment under 10 px | `dir=none` | — |
-| `W_LABEL_DETACHED` | warning | Label far from its connector | — | — |
-| `W_LABEL_AMBIGUOUS` | warning | Label closer to another connector than to its own | Identical fan siblings | AC-20 |
-| `W_EDGE_OVERLAP` | warning | Collinear segments overlap by more than 4 px | Edges sharing an end | — |
-| `W_MANY_CROSSINGS` | warning | More than 0.5 crossings per edge | — | — |
-| `W_EDGE_DETOUR` | warning | Route length minus Manhattan distance above max(300, 0.35 x (width + height)) (provisional, Q-5) | — | — |
-| `W_ILLEGIBLE_AT_FIT` | warning | Smallest effective text size under the profile minimum when fitted | — | AC-21 |
-| `W_LOW_CONTRAST` | warning | Text contrast under 4.5:1 in the theme | — | — |
-| `I_CROSSINGS` | info | Number of crossings | — | — |
-| `I_EDGE_HUGS_NODE` | info | Connector within 6 px of an unrelated leaf | — | — |
-| `I_ASPECT` | info | Aspect ratio above 3:1 (fix: other `dir`) | — | — |
-| `I_DENSITY` | info | More than 30 elements in one view (fix: split views) | — | — |
-| `I_CONSTRAINT_UNMET` | info | A `rank same` or `order` constraint does not hold in the layout | — | AC-23 |
+A geometric finding has a `fix` only where the Fix column names one (#56); the others are layout
+defects reported for the engine or need a judgement the tool cannot make, and carry none.
+
+| Code | Severity | Rule | Exceptions | AC | Fix |
+| --- | --- | --- | --- | --- | --- |
+| `E_NODE_OVERLAP` | error | Boxes of unrelated elements intersect | Parent and child | AC-15 | — |
+| `E_OUTSIDE_PARENT` | error | Child outside its group | — | AC-4 | — |
+| `E_TEXT_OVERFLOW` | error | A text line wider than the content box, or content outside a non-rectangular shape | — | AC-16 | — |
+| `E_EDGE_THROUGH_NODE` | error | An edge segment crosses an unrelated leaf node | Source, target and their ancestors | AC-17, AC-18 | — |
+| `E_EDGE_ENDPOINT_GAP` | error | An edge end lies more than 2 px from the real outline of its shape (4 px on curves) | Sequence: distance to the lifeline | AC-1, AC-19 | — |
+| `E_EDGE_UNROUTED` | error | The engine returned no route for an edge | — | — | — |
+| `E_LABEL_OVERLAPS_NODE` | error | A label over a leaf node or over the title of an unrelated group | — | AC-20 | — |
+| `E_LABEL_OVERLAPS_LABEL` | error | Two labels overlap | — | — | — |
+| `E_LABEL_OVERLAPS_EDGE` | error | A label is crossed by a connector other than its own (FR-15) | The label's own connector | AC-20 (node case only; see §20) | — |
+| `W_NODES_TOO_CLOSE` | warning | Gap under 12 px between leaves | — | — | — |
+| `W_TEXT_TRUNCATED` | warning | Text was elided | — | AC-9 | Shorten the label or description (`~node <id> "<shorter>"`) |
+| `W_EDGE_THROUGH_GROUP` | warning | Edge crosses a group containing neither end | Ancestor groups of an end | AC-18 | — |
+| `W_ARROW_TOO_SHORT` | warning | Last segment under 10 px | `dir=none` | — | — |
+| `W_LABEL_DETACHED` | warning | Label far from its connector | — | — | — |
+| `W_LABEL_AMBIGUOUS` | warning | Label closer to another connector than to its own | Identical fan siblings | AC-20 | — |
+| `W_EDGE_OVERLAP` | warning | Collinear segments overlap by more than 4 px | Edges sharing an end | — | — |
+| `W_MANY_CROSSINGS` | warning | More than 0.5 crossings per edge | — | — | — |
+| `W_EDGE_DETOUR` | warning | Route length minus Manhattan distance above max(300, 0.35 x (width + height)) (provisional, Q-5) | — | — | — |
+| `W_ILLEGIBLE_AT_FIT` | warning | Smallest effective text size under the profile minimum when fitted | — | AC-21 | Split the diagram into views (§13) |
+| `W_LOW_CONTRAST` | warning | Text contrast under 4.5:1 in the theme | — | — | — |
+| `I_CROSSINGS` | info | Number of crossings | — | — | — |
+| `I_EDGE_HUGS_NODE` | info | Connector within 6 px of an unrelated leaf | — | — | — |
+| `I_ASPECT` | info | Aspect ratio above 3:1 | — | — | Other `dir` (`~diagram dir=<LR or TB>`) |
+| `I_DENSITY` | info | More than 30 elements in one view | — | — | Split the diagram into views |
+| `I_CONSTRAINT_UNMET` | info | A `rank same` or `order` constraint does not hold in the layout | — | AC-23 | — |
 
 Thresholds marked provisional, and the severities of heuristic rules, are calibrated with the human
 evaluation (Q-5, #1 R-3).
@@ -836,9 +1004,16 @@ evaluation (Q-5, #1 R-3).
 - **Purpose:** the universal interface (ADR-0004); thin translation of argv to the API.
 - **Authentication / authorization:** none; runs with the caller's file permissions. `--workspace DIR`
   optionally confines paths like the MCP server (the CI action always passes it).
-- **Output:** compact text by default (summary line plus non-info findings, at most `--max` lines,
-  default 20); `--json` prints one JSON object with `"schema": 1` and the same content in full. Output
-  never contains colour codes or timings. Errors go to stderr.
+- **Output:** compact text by default: the summary line, then at most `--max` finding lines (default
+  20), errors and warnings first and info findings only when room is left, exactly as in §7.4; `--json`
+  prints one JSON object with `"schema": 1` and the same content in full (every severity, ASCII only,
+  §7.4). Every `check:` line printed for a file ends with the field `file=<path>` (path rule of §7.4), so
+  several files can be told apart. Output never contains colour codes or timings. Errors go to stderr.
+- **Limits:** the CLI and the MCP server use `DEFAULT_LIMITS`; v1 has no option to change a limit
+  from the command line or a tool call (#56 CR-18). Embedders configure limits through the `limits`
+  option of every file pipeline (§7.1), which is also how the limit tests (AC-45) set them. Rejected
+  alternative: one CLI option per limit, which would freeze twelve provisional names and values into
+  the CLI contract.
 
 | Command | Description | Main output |
 | --- | --- | --- |
@@ -906,7 +1081,9 @@ JSON shape of `check` (one object per file, wrapped in `{"schema":1,"files":[...
 | `diagram_diff` | `{ a, b }` | semantic diff |
 
 - **Errors:** a tool result with `isError: true` whose first line is `<CODE> <message>`; protocol
-  errors only for malformed calls.
+  errors only for malformed calls. When an accepted batch was written but layout failed (§7.3 rule 5),
+  the first line is followed by the CLI `apply` text (`ok <n> change(s)` and the changes), so the
+  agent sees that the file changed.
 - **Limits:** the core limits apply; `max` caps listed findings (default 20).
 - **Budget (NFR-5):** tool definitions plus instructions at most 720 tokens (o200k_base), measured by a
   test (AC-41); descriptions are one sentence each. If the measured total exceeds 720 tokens, the
@@ -962,11 +1139,11 @@ Every acceptance criterion maps to an automated test or a named manual check:
 
 | Test layer | What it proves | Acceptance criteria |
 | --- | --- | --- |
-| Unit tests (`format`, `ops`, `query`, `semantic`) | Statement and operation grammar, `label=`/`kind=` only in updates, canonical round trip, atomic batches with every failure, suggestions, re-parenting, stable edge ids after removing or reconnecting a parallel sibling, kinds and styles per type (§6.3), diff | AC-6, AC-7, AC-10 to AC-13, AC-35, AC-36 |
+| Unit tests (`format`, `ops`, `query`, `semantic`) | Statement and operation grammar, `label=`/`kind=` only in updates, canonical round trip, atomic batches with every failure, suggestions, re-parenting, stable edge ids after removing or reconnecting a parallel sibling, repeated bare `edge a>b` lines (`a>b`, `a>b#2`), `""` as absent and as clearing (edge label included), `-edge` against a group `edge`, defaults never written, tags sorted and deduplicated, ASCII ids, a 65-character id as `E_LIMIT_EXCEEDED`, `meta.__proto__` kept, kinds and styles per type (§6.3), diff | AC-6, AC-7, AC-10 to AC-13, AC-35, AC-36 |
 | Rule tests with synthetic geometry | One positive and one negative case per geometric code, plus each documented exception | AC-14 to AC-20 |
 | Corpus tests (benchmark cases 1-10 in `bench/cases`, #1 A-3) | 0 error-level findings, containment, message order, wrapping, constraint report, profiles | AC-1 to AC-5, AC-8, AC-9, AC-21 to AC-23 |
 | Golden files | SHA-256 of SVG and exports per case; 3 runs identical | AC-37 |
-| Output safety set | Labels with `<`, `&`, quotes, script text, an `<img onerror=...>` string and the Mermaid escape set in SVG, draw.io, Excalidraw, Mermaid and JSON; bidirectional and zero-width characters rejected; messages quote only truncated fragments | AC-24, AC-43 |
+| Output safety set | Labels with `<`, `&`, quotes, script text, an `<img onerror=...>` string and the Mermaid escape set in SVG, draw.io, Excalidraw, Mermaid and JSON; every rejected class of §7.2 rejected in a string, a bare word and a comment (U+202E in a comment, U+3164, U+034F, U+2028; a Persian label with U+200C rejected as the documented limitation); messages quote only truncated fragments; a file name with a line feed or U+202E in the text and JSON output of `check` (quoted or escaped, JSON ASCII only) | AC-24, AC-43 |
 | File-access tests | Symbolic link to a file outside the workspace, link loop, FIFO, hard-linked target, swap after check, Windows stream syntax; directory walk skips links | AC-31 |
 | Supply-chain checks | Install-script allow-list, `npm audit --omit=dev`, `npm audit signatures`, shrinkwrap in `npm pack`, font files listed by `npm pack --dry-run`, no `npx blueprint-drafter` line without an exact version in instruction documents (scope in §7.7; ADRs, design documents and the research archive excluded) | AC-46 |
 | Export tests | PNG size equals the viewBox; draw.io and Excalidraw parsed headless with their official libraries (dev dependencies) | AC-25, AC-27, AC-28 |
@@ -983,6 +1160,12 @@ Every acceptance criterion maps to an automated test or a named manual check:
 
 Manual checks (recorded in the QA report): opening the draw.io and Excalidraw exports in their desktop
 or locally hosted applications, without uploading the files to an external service.
+
+Codes without an acceptance criterion (#56): the AC column of §7.4 is traceability to #1, not a
+requirement list, and no criterion is added here (requirements belong to the Product Manager). Every
+code of the catalogue is produced by at least one automated test (unit, rule or pipeline test of the
+task that emits it), whether or not an AC names it; a test compares the code lists of the model, the
+architecture and `docs/reference/diagnostics.md`.
 
 ## 8. Data
 
@@ -1030,10 +1213,15 @@ or locally hosted applications, without uploading the files to an external servi
     escape); comparison is case-insensitive on Windows and macOS; NUL bytes, device paths (`\\?\`,
     `\\.\`, reserved Windows names), UNC paths and Windows alternate data streams (a `:` after the
     drive prefix) are refused; sources must end in `.bpd` and outputs in the extension of their format.
-    After opening, the real path of the opened handle is compared again with the workspace (closing the
-    window between check and use); a final-component symbolic link is never followed for writing; the
-    temporary file is created with exclusive-create flags in the target directory and renamed over the
-    target; writing to a target that has more than one hard link is refused. The resolved workspace is
+    After opening, the opened handle is compared with the checked path (closing the window between
+    check and use). Node.js has no portable call that returns the real path of an open handle, and
+    `O_NOFOLLOW` does not exist on Windows, so the portable mechanism is (#56 SR-13): `lstat` the
+    checked real path (it must be a regular file, not a link), `open` it, `fstat` the handle with
+    `{ bigint: true }` (64-bit file ids on Windows), and refuse unless `dev` and `ino` of both are equal
+    and the handle is a regular file; for writing, `nlink` must also be 1 (a target with more than one
+    hard link is refused) and a final-component symbolic link is never followed. The temporary file is
+    created with exclusive-create flags (`wx`) in the target directory, whose identity (`dev`, `ino`) is
+    checked before the temporary file is created and again before the `rename` over the target. The resolved workspace is
     printed on stderr at server start, and the file-system root or the user's home directory is refused
     as an implicit workspace (§7.6). The CLI applies the same policy when `--workspace` is given; the CI
     action always gives it.
@@ -1045,10 +1233,12 @@ or locally hosted applications, without uploading the files to an external servi
     `#` are written as Mermaid entity codes (`#lt;`, `#gt;`, `#amp;`, `#quot;`, `#96;`, `#124;`,
     `#91;`, `#93;`, `#123;`, `#125;`, `#40;`, `#41;`, `#35;`) and a newline as a fixed `<br/>`; it
     never emits `click`, `href`, `call` or `%%{init}%%` directives. The characters rejected by §7.2
-    (bidirectional, zero-width, C1, noncharacters) never reach an output.
+    (controls, separators, bidirectional controls, invisible characters, noncharacters, unpaired
+    surrogates) never reach an output.
   - B4 tool output into agents: the Skill and the MCP instructions say that diagram content is data;
     user text appears inside quoted strings in canonical lines, and messages quote only truncated,
-    sanitised fragments (§7.4). The instruction is advisory: a client may ignore it, so the design
+    sanitised fragments (§7.4); file paths are never in messages and are quoted or escaped where an
+    output names them, with JSON output in ASCII only (§7.4). The instruction is advisory: a client may ignore it, so the design
     limits the channel (short, quoted, no labels in messages) rather than preventing injection.
   - B5 supply chain: five direct runtime dependencies (§6.1) with a transitive production tree of
     about 120 packages (prototype measurement), most of it from the MCP SDK. Policy:
@@ -1085,7 +1275,7 @@ or locally hosted applications, without uploading the files to an external servi
   | B2 | Tampering with a file being edited by two agents | Atomic write and `E_STALE_FILE` |
   | B3 | Cross-site scripting when an SVG, draw.io or Mermaid file is opened | Escaping and forbidden elements (AC-24, AC-43) |
   | B3 | Mermaid directive or click injection | Generated ids, entity-escaped labels, no directives |
-  | B3 | Display spoofing (bidirectional or zero-width characters) | Rejected in the format (§7.2) |
+  | B3 | Display spoofing (bidirectional, invisible or separator characters) | Rejected anywhere in the format, comments included (§7.2) |
   | B4 | Prompt injection through labels or diagnostics | Content-is-data rule; quoted, truncated fragments in messages; the tool never acts on text |
   | B5 | Name squatting of `blueprint-drafter` on npm | Owner claims the name before publication; examples pin an exact version |
   | B5 | Malicious transitive dependency update or install script | Exact pins, shrinkwrap, install-script check, `npm audit` and signatures, reviewed lockfile diffs, provenance |
@@ -1154,7 +1344,8 @@ the diagnostics already suggest splitting into views (`I_DENSITY`, `W_ILLEGIBLE_
   the owner claims the npm name (§20). CI workflows (test matrix, lint, notices check, benchmark job) are
   created by a human (Issue #2).
 - **Configuration:** none required. Optional: `--workspace` or `BLUEPRINT_DRAFTER_WORKSPACE` for the
-  MCP server; command options for profile, theme and limits.
+  MCP server; command options for profile and theme. Limits are configurable through the API only
+  (§7.5).
 - **Rollout:** semantic versioning; pre-releases on the `next` dist-tag until the MVP gate (Q-1).
 - **Rollback:** move the `latest` dist-tag back and deprecate the faulty version; users pin exact
   versions in the CI action input, the Skill and the MCP configuration.
@@ -1200,10 +1391,13 @@ catching coordinates and typos early (AC-7); it can be relaxed later without bre
 | Apache-2.0 and runtime dependency licence policy | [ADR-0005](../decisions/ADR-0005-apache-2-0-and-dependency-licence-policy.md) | Accepted |
 | CLI binary `blueprint-drafter`, extension `.bpd`, header keyword `diagram` | [ADR-0006](../decisions/ADR-0006-name-binary-extension-and-header.md) | Accepted |
 | One npm package, one binary with an `mcp` subcommand, ESM for Node.js 22 or later | [ADR-0007](../decisions/ADR-0007-one-npm-package-compiled-esm-node-22.md) | Accepted |
+| Complete the text format v1 contract: ASCII ids and words, `""` as the empty value, repeated edge references, keyword reading after `-`, defaults, tags, rejected characters | [ADR-0008](../decisions/ADR-0008-complete-the-text-format-v1-contract.md) | Proposed (#56) |
 
 ## 19. Work packages for planning
 
-In dependency order. All ADRs are Accepted, so every package can be planned now.
+In dependency order. ADR-0001 to ADR-0007 are Accepted. ADR-0008 (Proposed, #56) settles the format
+points that WP-2, WP-3, WP-12 and WP-13 implement (§7.2 to §7.4); the tasks that cite it follow its
+rules once a human accepts it.
 
 1. **WP-1 Repository scaffold** — package manifest `blueprint-drafter` with exact-pinned direct
    dependencies, `tsc` ESM build with a `tsconfig` limited to `src/`, `node:test` runner with explicit
@@ -1215,13 +1409,14 @@ In dependency order. All ADRs are Accepted, so every package can be planned now.
    benchmark corpus cases 1-10 converted to the product format (#1 A-3). Prerequisite (owner): claim
    the npm name `blueprint-drafter` (§20) — depends on none.
 2. **WP-2 Model, format and semantic rules** — `model`, `format`, `semantic`, `limits` (byte, line,
-   element, label, id, depth); statement grammar, stable edge-id rules and string character rules of
-   §7.2; kinds and styles per diagram type with `W_NOT_FOR_TYPE`, `E_UNSUPPORTED_FOR_TYPE` and
+   element, label, id, depth); statement grammar, stable edge-id rules (including repeated bare
+   references), empty values, tags, defaults and the rejected-character rule of §7.2 (ADR-0008); kinds and styles per diagram type with `W_NOT_FOR_TYPE`, `E_UNSUPPORTED_FOR_TYPE` and
    `E_BAD_VALUE` as in §6.3; syntax and semantic codes; canonical serialisation; comments; AC-6, AC-7,
    AC-10 — depends on 1.
 3. **WP-3 Operations and queries** — `ops` per the operation grammar of §7.3 (update-only `label=`,
-   `kind=`, `from=`, `to=`), every-failure batches, suggestions, re-parenting, constraint removal,
-   siblings keep their edge ids, message quoting rule of §7.4; `query` (`show`, `diff`); AC-11 to
+   `kind=`, `from=`, `to=`), clearing with `""`, the keyword rule after `-`, every-failure batches,
+   suggestions, re-parenting, constraint removal, siblings keep their edge ids, message quoting rule
+   and line shapes of §7.4; `query` (`show`, `diff`); AC-11 to
    AC-13, AC-35, AC-36, AC-39 — depends on 2.
 4. **WP-4 Text and theme** — `text` (fontkit metrics on the vendored font, wrapping, elision), `theme`
    (roles, shapes, light and dark, density); FR-7 — depends on 1.
@@ -1282,7 +1477,10 @@ In dependency order. All ADRs are Accepted, so every package can be planned now.
 | Q-2 and #1 A-5: no layout-stability guarantee in the MVP; the `LayoutEngine` seam keeps a stable mode possible | question | MVP release checklist | @eliangilsierra |
 | Q-1: agent experiment budget and API keys (WP-19) | question | Continue-or-pivot gate (G-3) | @eliangilsierra |
 | Shrinkwrap delays transitive security fixes until a new release (§9 B5) | risk | Patch latency for users | Maintainers: release on high-severity advisories |
-| The `.bpd` extension may already be used by unrelated tools (not verified) | risk | File association confusion only | Accepted (ADR-0006) |
+| The `.bpd` extension may already be used by unrelated tools (not verified) | risk | File association confusion only | Open: owner to confirm (recorded in ADR-0006 Consequences) |
+| ADR-0008: the format points of #56 (§7.2, §7.3) | decision | Public contract of the file format; tasks #12, #13, #15, #16 and #46 follow it | @eliangilsierra (accept or reject the ADR) |
+| Default and only header `dir` of `sequence` is `TB` (§6.3); corpus case 5 then drops `dir=TB` | question | Canonical form of sequence files (#13 round trip) | @eliangilsierra (Proposed — owner confirms by merging) |
+| The rejected-character set of §7.2 blocks the zero-width joiner and non-joiner (Persian and some Indic scripts, emoji sequences) and variation selectors (emoji presentation) | risk | Labels in those scripts and some emoji are rejected with `E_SYNTAX` | @eliangilsierra (Proposed — owner confirms by merging; relaxing later is additive) |
 | ELK options for `rank same` and `order` are not verified (ASSUMPTION) | risk | FR-18 may rely on the post-check only | Developer (WP-6) |
 | A single elkjs call may not be interruptible except by terminating its worker (research A-6) | risk | Time budget design | Developer (WP-6) |
 | The official Excalidraw and draw.io libraries may need a DOM to load files headless | risk | AC-27, AC-28 test approach | Developer (WP-11) |
