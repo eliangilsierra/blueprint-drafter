@@ -16,6 +16,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { Worker } from "node:worker_threads";
 
 import { isRecord, repositoryRoot } from "./helpers.js";
+import { compiledName, discoverSources } from "./support/core-files.js";
 import {
   ForbiddenApiError,
   assertNoForbiddenCalls,
@@ -23,32 +24,12 @@ import {
   runUnderStubs,
 } from "./support/forbidden-apis.js";
 
-const SOURCE_EXTENSIONS = new Map([
-  [".ts", ".js"],
-  [".mts", ".mjs"],
-  [".cts", ".cjs"],
-]);
-
-/** Source files under a directory, at any depth, without declaration files (discovered at run time). */
-function discoverSources(directory: string): string[] {
-  const found: string[] = [];
-  for (const entry of readdirSync(directory, { withFileTypes: true, recursive: true })) {
-    const extension = [...SOURCE_EXTENSIONS.keys()].find((candidate) => entry.name.endsWith(candidate));
-    if (entry.isFile() && extension !== undefined && !/\.d\.[mc]?ts$/.test(entry.name)) {
-      found.push(join(entry.parentPath, entry.name));
-    }
-  }
-  return found.sort();
-}
-
 const sourceCore = join(repositoryRoot, "src", "core");
 // This file runs from dist-test/test/scaffold/, the compiled core is dist-test/src/core/.
 const compiledCore = fileURLToPath(new URL("../../src/core/", import.meta.url));
 
 function compiledPath(source: string): string {
-  const rest = relative(sourceCore, source);
-  const extension = [...SOURCE_EXTENSIONS.keys()].find((candidate) => rest.endsWith(candidate)) ?? ".ts";
-  return join(compiledCore, rest.slice(0, -extension.length) + (SOURCE_EXTENSIONS.get(extension) ?? ".js"));
+  return join(compiledCore, compiledName(relative(sourceCore, source)));
 }
 
 /** Files that the lint grant of #21 allows to use node:worker_threads, as compiled files. */
@@ -235,20 +216,53 @@ for (const [name, code, api] of RUNTIME_FORMS) {
   });
 }
 
+// Residual risks found by QA of PR #61, pinned (documented in support/forbidden-apis.ts and in the Pull Request):
+// if a later change closes one of them, turn its test around.
+
+test("residual O-1 (pinned): a forbidden call deferred by a timer after import escapes the guard", async () => {
+  const target = join(scratch, "deferred-write.txt");
+  const url = writeFixture(
+    `import { writeFileSync } from "node:fs";\nsetTimeout(() => writeFileSync(${JSON.stringify(target)}, "late"), 20);\n`,
+  );
+  const { calls, error } = await runUnderStubs(() => import(url));
+  assert.deepEqual(calls, [], "the guard sees nothing: the timer fires after the stubs are removed");
+  assert.equal(error, undefined);
+  for (let attempt = 0; attempt < 100 && !fs.existsSync(target); attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  assert.equal(readFileSync(target, "utf8"), "late", "the deferred write really happened after uninstall");
+});
+
+test("residual O-2 (pinned): the guard checks forbidden calls only, not prototype or global changes at import", async () => {
+  const url = writeFixture(
+    'Object.defineProperty(Array.prototype, "blueprintDrafterProbe", { value: 1, configurable: true });\nglobalThis.blueprintDrafterProbe = 1;\n',
+  );
+  try {
+    const { calls, error } = await runUnderStubs(() => import(url));
+    assert.deepEqual(calls, []);
+    assert.equal(error, undefined);
+    assert.equal(Reflect.get([], "blueprintDrafterProbe"), 1, "the prototype change went through unseen");
+  } finally {
+    Reflect.deleteProperty(Array.prototype, "blueprintDrafterProbe");
+    Reflect.deleteProperty(globalThis, "blueprintDrafterProbe");
+  }
+});
+
 // --- (a) Every module under src/core, imported under the stubs ---------------------------------------------------
 
 const coreSources = discoverSources(sourceCore);
 
-test("discovery finds .ts, .mts and .cts sources at any depth and skips declaration files", () => {
+test("discovery finds .ts, .tsx, .mts and .cts sources at any depth, skips declaration files and maps outputs", () => {
   const tree = join(scratch, "discovery");
-  for (const file of ["a.ts", "b/c.mts", "b/d/e.cts", "types.d.ts", "f.d.mts", "notes.md"]) {
+  for (const file of ["a.ts", "b/c.mts", "b/d/e.cts", "b/view.tsx", "types.d.ts", "f.d.mts", "notes.md"]) {
     fs.mkdirSync(join(tree, file, ".."), { recursive: true });
     writeFileSync(join(tree, file), "");
   }
   assert.deepEqual(
     discoverSources(tree).map((file) => relative(tree, file).split(sep).join("/")),
-    ["a.ts", "b/c.mts", "b/d/e.cts"],
+    ["a.ts", "b/c.mts", "b/d/e.cts", "b/view.tsx"],
   );
+  assert.deepEqual(["a.ts", "b/view.tsx", "c.mts", "d.cts"].map(compiledName), ["a.js", "b/view.js", "c.mjs", "d.cjs"]);
   assert.ok(coreSources.includes(join(sourceCore, "index.ts")), "src/core/index.ts is discovered");
 });
 

@@ -13,6 +13,11 @@
 // - The stubs cover this thread only. Code inside a worker thread (#21) runs without them.
 // - process.dlopen stays in place: native add-ons (@resvg/resvg-js) load through it, and native code is not
 //   observable from JavaScript.
+// - Only calls made while the stubs are installed are seen. Work that a module schedules at import and that runs
+//   later (a timer, setImmediate, an I/O or event callback) escapes runUnderStubs(); promise reactions queued during
+//   the import still run inside it. Pinned by "residual O-1" in core-stubs.test.ts.
+// - Only forbidden calls are checked. Other import-time side effects (a change to a prototype or a new global) are
+//   not detected. Pinned by "residual O-2" in core-stubs.test.ts; AGENTS.md asks that core modules have none.
 // Reused by the end-to-end isolation suite of #46.
 
 import { constants } from "node:fs";
