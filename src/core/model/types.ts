@@ -6,7 +6,7 @@
  * the other sections need, and they are recorded as a question on #56.
  */
 
-import type { DiagnosticCode } from "./diagnostics.js";
+import type { DiagnosticCode, SeverityOfCode } from "./diagnostics.js";
 import type {
   Arrowhead,
   ConstraintType,
@@ -16,7 +16,6 @@ import type {
   EdgeDir,
   EdgeStyle,
   ResultStatus,
-  Severity,
   Shape,
   Theme,
 } from "./enums.js";
@@ -24,14 +23,27 @@ import type {
 // ---------------------------------------------------------------------------------------------------------
 // Diagram
 
-/** Opaque user metadata (`meta.*` attributes): preserved and serialised sorted by key, never used for layout. */
-export type Meta = Record<string, string>;
+/**
+ * Opaque user metadata (`meta.*` attributes), by key without the `meta.` prefix: preserved and serialised sorted
+ * by key, never used for layout.
+ *
+ * A `ReadonlyMap`, not an object: the keys come from the file (`meta.` followed by an ID) and `__proto__`,
+ * `constructor`, `toString` and `hasOwnProperty` are valid IDs, which a plain object would drop or confuse with
+ * its prototype. For the same reason a `Diagram` is not JSON-serialisable as it is (`JSON.stringify` writes a
+ * `Map` as `{}`): the serialiser and the JSON outputs convert explicitly. To change metadata, build a new map.
+ *
+ * Open question: #56 (item 8): the architecture says only `meta?`, so the representation is an implementation
+ * choice that the parser (#12) and the serialiser (#13) follow.
+ */
+export type Meta = ReadonlyMap<string, string>;
 
 export interface Group {
   id: string;
   /**
    * Usually one of `GROUP_KINDS`. A kind outside the closed set is kept as written (`W_UNKNOWN_KIND`, drawn
    * with the generic shape), so the type is `string`; `isGroupKind` tells the two apart.
+   *
+   * Open question: #56 (item 2).
    */
   kind: string;
   label: string;
@@ -44,7 +56,7 @@ export interface Group {
 
 export interface Node {
   id: string;
-  /** Usually one of `NODE_KINDS`; see {@link Group.kind}. */
+  /** Usually one of `NODE_KINDS`; see {@link Group.kind}. Open question: #56 (item 2). */
   kind: string;
   label: string;
   /** Id of the containing group. */
@@ -83,6 +95,8 @@ export interface Constraint {
  * order. Comments above a statement move with it, so they are keyed by the statement: `group <id>`, `node <id>`,
  * `edge <id>`, `rank same <ids>` or `order <ids>` (ids joined by a comma, no spaces). A `Map` is used because
  * ids such as `__proto__` are valid ids and must not reach an object's prototype.
+ *
+ * Open question: #56 (item 1): architecture 7.1 gives no shape for `comments`.
  */
 export interface DiagramComments {
   /** Comments above the header. */
@@ -110,10 +124,10 @@ export interface Diagram {
 // ---------------------------------------------------------------------------------------------------------
 // Diagnostics
 
-export interface Diagnostic {
-  /** Derived from the prefix of the code (`E_`, `W_`, `I_`); use `createDiagnostic` to build one. */
-  severity: Severity;
-  code: DiagnosticCode;
+interface DiagnosticOf<C extends DiagnosticCode> {
+  /** Derived from the prefix of the code (`E_`, `W_`, `I_`); `createDiagnostic` builds one. */
+  severity: SeverityOfCode<C>;
+  code: C;
   ids: string[];
   message: string;
   /** A concrete correction, written as an operation where possible. */
@@ -125,6 +139,12 @@ export interface Diagnostic {
   /** Index of the operation the finding refers to. */
   op?: number;
 }
+
+/**
+ * A finding. The fields are those of architecture 7.1; the type is a union over the catalogue codes so that the
+ * severity cannot contradict the code: `{ severity: 'info', code: 'E_SYNTAX', ... }` does not compile.
+ */
+export type Diagnostic = { [C in DiagnosticCode]: DiagnosticOf<C> }[DiagnosticCode];
 
 export interface Summary {
   errors: number;
@@ -152,7 +172,11 @@ export interface Metrics {
 // ---------------------------------------------------------------------------------------------------------
 // Layout
 
-/** Width and height in CSS pixels (a fit canvas, `--fit WxH`). */
+/**
+ * Width and height in CSS pixels (a fit canvas, `--fit WxH`).
+ *
+ * Open question: #56 (item 3).
+ */
 export interface Size {
   width: number;
   height: number;
@@ -170,7 +194,11 @@ export interface Box {
   h: number;
 }
 
-/** Lines of text drawn at one size, with their measured widths. */
+/**
+ * Lines of text drawn at one size, with their measured widths.
+ *
+ * Open question: #56 (item 4).
+ */
 export interface TextBlock {
   lines: string[];
   /** Measured width of each line, same length as `lines`. */
@@ -181,7 +209,11 @@ export interface TextBlock {
   y: number;
 }
 
-/** A node as sized from measured text, before it is placed. */
+/**
+ * A node as sized from measured text, before it is placed.
+ *
+ * Open question: #56 (items 3 and 4).
+ */
 export interface SizedNode {
   id: string;
   w: number;
@@ -194,21 +226,25 @@ export interface SizedNode {
   truncated: boolean;
 }
 
+/** Open question: #56 (item 4). */
 export interface LayoutNode extends SizedNode {
   x: number;
   y: number;
 }
 
+/** Open question: #56 (item 4). */
 export interface LayoutGroup extends LayoutNode {
   /** Box of the group title, relative to the group box. */
   title: Box;
 }
 
+/** Open question: #56 (item 4). */
 export interface LabelBox extends Box {
   lines: string[];
   fontSize: number;
 }
 
+/** Open question: #56 (item 4). */
 export interface LayoutEdge {
   id: string;
   points: Point[];
@@ -216,7 +252,11 @@ export interface LayoutEdge {
   arrowheads: { start: Arrowhead; end: Arrowhead };
 }
 
-/** Vertical line under a participant of a sequence diagram. */
+/**
+ * Vertical line under a participant of a sequence diagram.
+ *
+ * Open question: #56 (item 4).
+ */
 export interface Lifeline {
   id: string;
   x: number;
@@ -224,6 +264,7 @@ export interface Lifeline {
   y2: number;
 }
 
+/** Open question: #56 (items 4 and 5). */
 export interface Layout {
   width: number;
   height: number;
@@ -247,11 +288,13 @@ export interface LayoutLimits {
   layoutWorkerHeapMb?: number;
 }
 
+/** Open question: #56 CR-18 and item 3: architecture 7.1 gives no fields for the layout options. */
 export interface LayoutOptions {
   /** Open question: #56 CR-18. */
   limits?: LayoutLimits;
 }
 
+/** Open question: #56 (item 3). */
 export interface ValidateOptions {
   /** A profile name; an unknown name fails with `E_UNKNOWN_PROFILE`, so it is a string, not `ProfileName`. */
   profile?: string;
@@ -307,6 +350,7 @@ export interface ApplyResult {
 
 export type DiffKind = "header" | "group" | "node" | "edge" | "constraint";
 
+/** Open question: #56 (item 3). */
 export interface DiffEntry {
   change: "+" | "-" | "~";
   kind: DiffKind;
@@ -337,6 +381,7 @@ export interface WriteResult {
   diagnostics: Diagnostic[];
 }
 
+/** Open question: #56 (item 3). */
 export interface ShowSelection {
   around?: string;
   depth?: number;
@@ -355,7 +400,11 @@ export interface PipelineResult {
   diagnostics: Diagnostic[];
 }
 
-/** Result of `newFile` and `renderFile`. */
+/**
+ * Result of `newFile` and `renderFile`.
+ *
+ * Open question: #56 (item 3).
+ */
 export interface FileResult extends PipelineResult {
   /** Path of the file that was created or written. */
   path?: string;
@@ -368,7 +417,7 @@ export interface FileResult extends PipelineResult {
  *
  * Open question: #56 CR-19 (user-visible output when layout fails after an accepted batch is written): the
  * assumed default is `written: true` with `status: 'failed'` and `E_LAYOUT_TIMEOUT` or `E_INTERNAL` in
- * `diagnostics`.
+ * `diagnostics`. The name `check` of the last field is open too (item 3).
  */
 export interface ApplyFileResult extends PipelineResult {
   changes: string[];
@@ -379,38 +428,54 @@ export interface ApplyFileResult extends PipelineResult {
   check?: CheckResult;
 }
 
-/** The check of one discovered file. */
+/**
+ * The check of one discovered file.
+ *
+ * Open question: #56 (item 3).
+ */
 export interface FileCheck {
   file: string;
   profile: string;
   check: CheckResult;
 }
 
+/** Open question: #56 (item 3). */
 export interface CheckFilesResult extends PipelineResult {
   /** One entry per discovered file, in the order of discovery. */
   files: FileCheck[];
 }
 
-/** Result of `showFile`. */
+/**
+ * Result of `showFile`.
+ *
+ * Open question: #56 (item 3).
+ */
 export interface TextResult extends PipelineResult {
   text?: string;
 }
 
+/** Open question: #56 (item 3). */
 export interface DiffFileResult extends PipelineResult {
   entries: DiffEntry[];
 }
 
-/** Result of `exportFile`: with no output path the text is returned. */
+/**
+ * Result of `exportFile`: with no output path the text is returned.
+ *
+ * Open question: #56 (item 3).
+ */
 export interface ExportFileResult extends PipelineResult {
   text?: string;
   path?: string;
 }
 
+/** Open question: #56 (item 3). */
 export interface FormatResult extends PipelineResult {
   /** Files that were rewritten, or with `check`, files that are not canonical. */
   files: string[];
 }
 
+/** Open question: #56 (item 3). */
 export interface DiscoveryResult extends PipelineResult {
   /** Diagram files found, sorted by code point. */
   files: string[];

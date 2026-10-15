@@ -14,7 +14,7 @@ import { compareCodePoints } from "./util.js";
 // with `docs/reference/diagnostics.md` and with the architecture, so the three cannot drift apart.
 
 /** Syntax, operations, files and limits. */
-export const SYNTAX_CODES = [
+export const SYNTAX_CODES = Object.freeze([
   "E_SYNTAX",
   "E_MISSING_HEADER",
   "E_VERSION_UNSUPPORTED",
@@ -36,10 +36,10 @@ export const SYNTAX_CODES = [
   "E_BAD_EXTENSION",
   "E_STALE_FILE",
   "E_INTERNAL",
-] as const;
+] as const);
 
 /** Semantic rules on the model. */
-export const SEMANTIC_CODES = [
+export const SEMANTIC_CODES = Object.freeze([
   "E_BAD_ID",
   "E_UNKNOWN_PARENT",
   "E_PARENT_NOT_GROUP",
@@ -55,10 +55,10 @@ export const SEMANTIC_CODES = [
   "W_C4_LEVEL_MIX",
   "I_SELF_LOOP",
   "I_ISOLATED",
-] as const;
+] as const);
 
 /** Geometric, legibility and composition rules on a layout. */
-export const GEOMETRIC_CODES = [
+export const GEOMETRIC_CODES = Object.freeze([
   "E_NODE_OVERLAP",
   "E_OUTSIDE_PARENT",
   "E_TEXT_OVERFLOW",
@@ -84,10 +84,10 @@ export const GEOMETRIC_CODES = [
   "I_ASPECT",
   "I_DENSITY",
   "I_CONSTRAINT_UNMET",
-] as const;
+] as const);
 
 /** Every code of the v1 catalogue. */
-export const DIAGNOSTIC_CODES = [...SYNTAX_CODES, ...SEMANTIC_CODES, ...GEOMETRIC_CODES] as const;
+export const DIAGNOSTIC_CODES = Object.freeze([...SYNTAX_CODES, ...SEMANTIC_CODES, ...GEOMETRIC_CODES] as const);
 export type DiagnosticCode = (typeof DIAGNOSTIC_CODES)[number];
 
 const CODE_SET: ReadonlySet<string> = new Set(DIAGNOSTIC_CODES);
@@ -112,9 +112,25 @@ const ELLIPSIS = "…";
 
 // Removed from untrusted text: control characters (Cc: C0, DEL, C1), format characters (Cf: bidirectional controls
 // U+202A to U+202E and U+2066 to U+2069, zero-width characters U+200B to U+200D and U+FEFF, tag characters), line
-// and paragraph separators (Zl, Zp), noncharacters and lone surrogates (Cs). A line feed is not removed: it is
-// written as the \n escape of the format instead.
+// and paragraph separators (Zl, Zp), noncharacters and lone surrogates (Cs). In quoteFragment a line feed is not
+// removed: it is written as the \n escape of the format instead.
+//
+// Open question: #56 (item 9). Architecture 7.2 lists only control, bidirectional and zero-width characters,
+// noncharacters and unpaired surrogates. The classes Cf (beyond those ranges), Zl and Zp are a superset kept here
+// for message safety. Blank-looking characters outside these classes (U+3164, U+FFA0, U+115F, U+1160, U+034F,
+// U+180B to U+180D) are NOT removed, because the architecture does not list them.
 const REMOVED = /^[\p{Cc}\p{Cf}\p{Zl}\p{Zp}\p{Cs}\p{Noncharacter_Code_Point}]$/u;
+
+/** Removes the characters of {@link REMOVED}, line feeds included, without quoting or escaping. */
+function stripUntrusted(text: string): string {
+  let result = "";
+  for (const codePoint of text) {
+    if (!REMOVED.test(codePoint)) {
+      result += codePoint;
+    }
+  }
+  return result;
+}
 
 function escapeCodePoint(codePoint: string): string {
   switch (codePoint) {
@@ -138,6 +154,9 @@ function escapeCodePoint(codePoint: string): string {
  * is cut to whole characters and ends with an ellipsis (U+2026). An escape or a surrogate pair is never split, so
  * the result is at most 82 code units with the quotes. Every module that puts an id, token or operation into a
  * message must use it; labels and descriptions are never echoed in messages.
+ *
+ * Open question: #56 (item 7): the readings of this function (a line feed written as the n escape, the stripped
+ * classes, the unit of the 80-character limit) are to be confirmed.
  */
 export function quoteFragment(text: string): string {
   const pieces: string[] = [];
@@ -149,6 +168,11 @@ export function quoteFragment(text: string): string {
     const piece = escapeCodePoint(codePoint);
     pieces.push(piece);
     length += piece.length;
+    if (length > MAX_FRAGMENT_LENGTH) {
+      // The text is longer than the bound and will be truncated: the rest cannot change the result, so the cost
+      // stays constant whatever the length of the input.
+      break;
+    }
   }
   if (length <= MAX_FRAGMENT_LENGTH) {
     return `"${pieces.join("")}"`;
@@ -200,7 +224,12 @@ export interface DiagnosticExtras {
  * Optional parts that are not given are absent from the result (not `undefined`), so a diagnostic serialises to
  * the same JSON whichever way it was built. `ids` is copied.
  *
- * A message that quotes untrusted text must pass each fragment through {@link quoteFragment}.
+ * `ids` and `fix` often carry untrusted tokens (an id that failed the id pattern, an operation), and the text form
+ * of a finding puts them on one line (architecture 7.4), so they are stripped of control (line feeds included),
+ * bidirectional, zero-width and the other removed characters, as in {@link quoteFragment} but without quotes or
+ * escapes. A quote or a backslash in `fix` is kept: a fix is an operation. The `message` is left as given, because
+ * it is built from fixed text and fragments that already went through {@link quoteFragment}; a message that quotes
+ * untrusted text must pass each fragment through it.
  */
 export function createDiagnostic(
   code: DiagnosticCode,
@@ -208,9 +237,11 @@ export function createDiagnostic(
   message: string,
   extras: DiagnosticExtras = {},
 ): Diagnostic {
-  const diagnostic: Diagnostic = { severity: severityOfCode(code), code, ids: [...ids], message };
+  // The cast is sound: severityOfCode derives the severity from the same prefix that SeverityOfCode reads, and a
+  // test checks every code of the catalogue. TypeScript cannot relate the two through the union of 61 codes.
+  const diagnostic = { severity: severityOfCode(code), code, ids: ids.map(stripUntrusted), message } as Diagnostic;
   if (extras.fix !== undefined) {
-    diagnostic.fix = extras.fix;
+    diagnostic.fix = stripUntrusted(extras.fix);
   }
   if (extras.auto !== undefined) {
     diagnostic.auto = extras.auto;

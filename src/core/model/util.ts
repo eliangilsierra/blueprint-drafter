@@ -86,7 +86,12 @@ export function derivedEdgeId(from: string, to: string, taken: ReadonlySet<strin
 // n is written without leading zeros and is at least 2.
 const DERIVED_REF = /^[^>#\s]+>[^>#\s]+(?:#(?:[2-9]|[1-9][0-9]+))?$/;
 
-/** Whether `id` has the derived form `from>to` or `from>to#n` (n >= 2) rather than being an explicit id. */
+/**
+ * Whether `id` has the derived form `from>to` or `from>to#n` (n >= 2) rather than being an explicit id.
+ *
+ * Open question: #56 (item 6): `letter` in the `ID` grammar is not defined, so the endpoints are not checked
+ * against the id pattern here.
+ */
 export function isDerivedRef(id: string): boolean {
   return DERIVED_REF.test(id);
 }

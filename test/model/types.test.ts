@@ -76,6 +76,7 @@ import type {
   Workspace,
   WriteResult,
 } from "../../src/core/model/types.js";
+import { compareCodePoints } from "../../src/core/model/util.js";
 import { readText, repositoryRoot } from "../scaffold/helpers.js";
 
 /** Compile-time check: the call only compiles when `T` is `true`. */
@@ -114,6 +115,19 @@ describe("closed enumerations (T-AC-3)", () => {
       assert.equal(new Set(set).size, set.length);
       assert.ok(set.every((value) => value.length > 0));
     }
+  });
+
+  it("are frozen, so no code can change a set at run time", () => {
+    for (const set of [
+      DIAGRAM_TYPES, NODE_KINDS, GROUP_KINDS, DIRECTIONS, THEMES, DENSITIES, EDGE_STYLES, EDGE_DIRS, PROFILES,
+      SEVERITIES, CONSTRAINT_TYPES, RESULT_STATUSES, SHAPES, ARROWHEADS,
+    ] as ReadonlyArray<readonly string[]>) {
+      assert.ok(Object.isFrozen(set));
+    }
+    assert.throws(() => {
+      (SEVERITIES as unknown as string[]).reverse();
+    }, TypeError);
+    assert.deepEqual(SEVERITIES, ["error", "warning", "info"]);
   });
 
   describe("equal the closed value sets in the architecture document", () => {
@@ -323,7 +337,7 @@ describe("type shapes match architecture section 7.1", () => {
       dir: "TB",
       theme: "light",
       density: "normal",
-      groups: [{ id: "c1", kind: "boundary", label: "Internet Banking", desc: "d", tags: ["t"], meta: { owner: "x" } }],
+      groups: [{ id: "c1", kind: "boundary", label: "Internet Banking", desc: "d", tags: ["t"], meta: new Map([["owner", "x"]]) }],
       nodes: [
         { id: "spa", kind: "webapp", label: "Single-Page App", in: "c1", tech: "Angular" },
         { id: "api", kind: "container", label: "API", in: "c1" },
@@ -331,7 +345,7 @@ describe("type shapes match architecture section 7.1", () => {
       edges: [
         { id: "spa>api", from: "spa", to: "api", label: "Uses", style: "async", dir: "fwd", explicitId: false },
         { id: "spa>api#2", from: "spa", to: "api", explicitId: false },
-        { id: "calls", from: "api", to: "c1", explicitId: true, meta: { k: "v" } },
+        { id: "calls", from: "api", to: "c1", explicitId: true, meta: new Map([["k", "v"]]) },
       ],
       constraints: [{ type: "same-rank", ids: ["spa", "api"] }],
       comments: { header: ["# top"], statements: new Map([["node spa", ["# the spa"]]]), trailing: [] },
@@ -374,6 +388,74 @@ describe("type shapes match architecture section 7.1", () => {
     assert.deepEqual(comments.statements.get("node __proto__"), ["# odd id"]);
     assert.equal(Object.getPrototypeOf(comments.statements), Map.prototype);
   });
+});
+
+describe("meta keys (#56 item 8)", () => {
+  // Valid IDs that a plain object would drop (__proto__) or confuse with its prototype (the others).
+  const dangerous = ["__proto__", "constructor", "toString", "hasOwnProperty", "valueOf", "prototype"];
+
+  it("is a read-only map, not an object", () => {
+    assertType<Equal<NonNullable<Group["meta"]>, ReadonlyMap<string, string>>>();
+    assertType<Equal<NonNullable<Node["meta"]>, ReadonlyMap<string, string>>>();
+    assertType<Equal<NonNullable<Edge["meta"]>, ReadonlyMap<string, string>>>();
+    const typeChecks = (): unknown[] => [
+      // @ts-expect-error a plain object is not accepted: its keys would collide with the prototype
+      ((): Node => ({ id: "n", kind: "db", label: "N", meta: { owner: "x" } }))(),
+    ];
+    assertType<Equal<"set" extends keyof NonNullable<Node["meta"]> ? true : false, false>>();
+    assert.equal(typeof typeChecks, "function");
+  });
+
+  it("keeps every key, including __proto__, constructor, toString and hasOwnProperty", () => {
+    const meta: NonNullable<Node["meta"]> = new Map(dangerous.map((key, index) => [key, `v${String(index)}`]));
+    const holders: Array<Node | Group | Edge> = [
+      { id: "n", kind: "db", label: "N", meta },
+      { id: "g", kind: "boundary", label: "G", meta: new Map(meta) },
+      { id: "a>b", from: "a", to: "b", explicitId: false, meta: structuredClone(meta) },
+    ];
+    for (const holder of holders) {
+      const stored = holder.meta ?? new Map<string, string>();
+      assert.equal(stored.size, dangerous.length);
+      dangerous.forEach((key, index) => {
+        assert.equal(stored.has(key), true, key);
+        assert.equal(stored.get(key), `v${String(index)}`, key);
+      });
+      assert.equal(stored.get("missing"), undefined);
+    }
+  });
+
+  it("sorts by code point whatever the key", () => {
+    const meta: NonNullable<Node["meta"]> = new Map([["toString", "1"], ["__proto__", "2"], ["Z", "3"], ["a", "4"]]);
+    assert.deepEqual([...meta.keys()].sort(compareCodePoints), ["Z", "__proto__", "a", "toString"]);
+  });
+});
+
+describe("assumed shapes are marked with Open question: #56", () => {
+  const source = readText("src", "core", "model", "types.ts");
+
+  /** The doc comment that ends right before `export interface|type <name>`. */
+  function docCommentOf(name: string): string {
+    const declaration = new RegExp(`\\nexport (?:interface|type) ${name}\\b`).exec(source);
+    assert.ok(declaration, `${name} is not declared in types.ts`);
+    const before = source.slice(0, declaration.index);
+    const start = before.lastIndexOf("/**");
+    const end = before.lastIndexOf("*/");
+    assert.ok(start !== -1 && end > start, `${name} has no doc comment`);
+    assert.ok(!before.slice(end + 2).trim(), `${name} has no doc comment directly above it`);
+    return before.slice(start, end);
+  }
+
+  const assumed = [
+    "Meta", "DiagramComments", "Size", "TextBlock", "SizedNode", "LayoutNode", "LayoutGroup", "LabelBox",
+    "LayoutEdge", "Lifeline", "Layout", "LayoutLimits", "LayoutOptions", "ValidateOptions", "DiffEntry",
+    "ShowSelection", "PipelineResult", "FileResult", "ApplyFileResult", "FileCheck", "CheckFilesResult",
+    "TextResult", "DiffFileResult", "ExportFileResult", "FormatResult", "DiscoveryResult",
+  ];
+  for (const name of assumed) {
+    it(`${name} says which #56 question it depends on`, () => {
+      assert.match(docCommentOf(name), /Open question: #56/);
+    });
+  }
 });
 
 describe("model depends on nothing (architecture section 6.1)", () => {

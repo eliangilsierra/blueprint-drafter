@@ -25,8 +25,8 @@ function assertType<T extends true>(value?: T): T | undefined {
 /** Mutual assignability: enough for unions of literals, `keyof` and object types, which is all these tests compare. */
 type Equal<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
 
-function diag(severity: Diagnostic["severity"], code: DiagnosticCode, ids: string[], message = "m"): Diagnostic {
-  return { severity, code, ids, message };
+function diag(code: DiagnosticCode, ids: string[], message = "m"): Diagnostic {
+  return createDiagnostic(code, ids, message);
 }
 
 describe("createDiagnostic (AC-14, type part)", () => {
@@ -100,8 +100,45 @@ describe("createDiagnostic (AC-14, type part)", () => {
       ((): Diagnostic => ({ severity: "error", ids: [], message: "m" }))(),
       // @ts-expect-error a severity outside the closed set
       ((): Diagnostic => ({ severity: "fatal", code: "E_SYNTAX", ids: [], message: "m" }))(),
+      // @ts-expect-error the severity must match the prefix of the code
+      ((): Diagnostic => ({ severity: "info", code: "E_SYNTAX", ids: [], message: "m" }))(),
+      // @ts-expect-error the severity must match the prefix of the code
+      ((): Diagnostic => ({ severity: "error", code: "W_UNKNOWN_KIND", ids: [], message: "m" }))(),
     ];
     assert.equal(typeof typeChecks, "function");
+  });
+
+  it("builds only diagnostics whose severity matches the prefix of the code, for every code of the catalogue", () => {
+    for (const code of DIAGNOSTIC_CODES) {
+      const expected = { E: "error", W: "warning", I: "info" }[code.charAt(0) as "E" | "W" | "I"];
+      assert.equal(createDiagnostic(code, [], "m").severity, expected, code);
+    }
+  });
+
+  describe("untrusted ids and fix", () => {
+    const rlo = String.fromCharCode(0x202e);
+    const zwsp = String.fromCharCode(0x200b);
+    const nul = String.fromCharCode(0);
+
+    it("strips control, bidirectional and zero-width characters, line feeds included", () => {
+      const d = createDiagnostic("E_UNKNOWN_ID", [`a${rlo}b\nc`, `x${zwsp}y${nul}z\r\t`], "m", {
+        fix: `did you mean ${rlo}"trips"\n?`,
+      });
+      assert.deepEqual(d.ids, ["abc", "xyz"]);
+      assert.equal(d.fix, 'did you mean "trips"?');
+    });
+
+    it("keeps a quote, a backslash and other text of a fix, which is an operation", () => {
+      const fix = '+group g boundary "G" in=a\\b';
+      assert.equal(createDiagnostic("E_UNKNOWN_PARENT", ["g"], "m", { fix }).fix, fix);
+      assert.deepEqual(createDiagnostic("E_BAD_ID", ["café", "日本"], "m").ids, ["café", "日本"]);
+    });
+
+    it("keeps a text-form line on one line when an id holds a line feed and a bidirectional character", () => {
+      const d = createDiagnostic("E_BAD_ID", [`ok\nE E_INTERNAL forged${rlo}`], "m");
+      const line = `E ${d.code} ${d.ids.join(",")} — ${d.message}`;
+      assert.ok(!/[\n\r‮]/.test(line), JSON.stringify(line));
+    });
   });
 });
 
@@ -161,6 +198,16 @@ describe("catalogue", () => {
     assert.deepEqual(DIAGNOSTIC_CODES, [...SYNTAX_CODES, ...SEMANTIC_CODES, ...GEOMETRIC_CODES]);
   });
 
+  it("is frozen, so no code can change the catalogue at run time", () => {
+    for (const list of [SYNTAX_CODES, SEMANTIC_CODES, GEOMETRIC_CODES, DIAGNOSTIC_CODES]) {
+      assert.ok(Object.isFrozen(list));
+    }
+    assert.throws(() => {
+      (DIAGNOSTIC_CODES as unknown as string[]).push("E_NOT_IN_THE_CATALOGUE");
+    }, TypeError);
+    assert.equal(isDiagnosticCode("E_NOT_IN_THE_CATALOGUE"), false);
+  });
+
   it("uses only well-formed code names with a severity prefix", () => {
     for (const code of DIAGNOSTIC_CODES) {
       assert.match(code, /^[EWI]_[A-Z][A-Z0-9_]*$/);
@@ -189,20 +236,21 @@ describe("catalogue", () => {
 });
 
 describe("compareDiagnostics and sortDiagnostics (T-AC-2)", () => {
-  const mixed: Diagnostic[] = [
-    diag("info", "I_ISOLATED", ["z"]),
-    diag("warning", "W_NODES_TOO_CLOSE", ["a", "b"]),
-    diag("error", "E_NODE_OVERLAP", ["b", "c"]),
-    diag("info", "I_CROSSINGS", []),
-    diag("error", "E_DANGLING_EDGE", ["e2"]),
-    diag("warning", "W_LOW_CONTRAST", ["n1"]),
-    diag("error", "E_DANGLING_EDGE", ["e1"]),
-    diag("error", "E_NODE_OVERLAP", ["b"]),
-    diag("info", "I_ISOLATED", ["a"]),
-    diag("warning", "W_NODES_TOO_CLOSE", ["a", "a"]),
-    diag("error", "E_NODE_OVERLAP", ["B"]),
-    diag("error", "E_NODE_OVERLAP", ["\u{1f600}"]),
-    diag("error", "E_NODE_OVERLAP", ["～"]),
+  // A fresh, deliberately unsorted list for every test: no test can see the effect of another one.
+  const mixed = (): Diagnostic[] => [
+    diag("I_ISOLATED", ["z"]),
+    diag("W_NODES_TOO_CLOSE", ["a", "b"]),
+    diag("E_NODE_OVERLAP", ["b", "c"]),
+    diag("I_CROSSINGS", []),
+    diag("E_DANGLING_EDGE", ["e2"]),
+    diag("W_LOW_CONTRAST", ["n1"]),
+    diag("E_DANGLING_EDGE", ["e1"]),
+    diag("E_NODE_OVERLAP", ["b"]),
+    diag("I_ISOLATED", ["a"]),
+    diag("W_NODES_TOO_CLOSE", ["a", "a"]),
+    diag("E_NODE_OVERLAP", ["B"]),
+    diag("E_NODE_OVERLAP", ["\u{1f600}"]),
+    diag("E_NODE_OVERLAP", ["～"]),
   ];
 
   const expectedOrder = [
@@ -224,16 +272,16 @@ describe("compareDiagnostics and sortDiagnostics (T-AC-2)", () => {
   const summary = (list: readonly Diagnostic[]): unknown[] => list.map((d) => [d.severity, d.code, d.ids]);
 
   it("orders by severity (error, warning, info), then code, then ids", () => {
-    assert.deepEqual(summary(sortDiagnostics(mixed)), expectedOrder);
+    assert.deepEqual(summary(sortDiagnostics(mixed())), expectedOrder);
   });
 
   it("puts every error before every warning before every info, whatever the codes", () => {
     const sorted = sortDiagnostics([
-      diag("info", "I_ASPECT", []),
-      diag("warning", "W_EDGE_DETOUR", []),
-      diag("error", "E_SYNTAX", []),
-      diag("info", "I_CROSSINGS", []),
-      diag("error", "E_BAD_ID", []),
+      diag("I_ASPECT", []),
+      diag("W_EDGE_DETOUR", []),
+      diag("E_SYNTAX", []),
+      diag("I_CROSSINGS", []),
+      diag("E_BAD_ID", []),
     ]);
     assert.deepEqual(
       sorted.map((d) => d.severity),
@@ -242,22 +290,40 @@ describe("compareDiagnostics and sortDiagnostics (T-AC-2)", () => {
   });
 
   it("gives the same order when it is sorted twice", () => {
-    const once = sortDiagnostics(mixed);
+    const once = sortDiagnostics(mixed());
     assert.deepEqual(sortDiagnostics(once), once);
   });
 
   it("gives the same order whatever the input order", () => {
-    const reversed = [...mixed].reverse();
-    const shifted = [...mixed.slice(5), ...mixed.slice(0, 5)];
-    const expected = summary(sortDiagnostics(mixed));
+    const reversed = mixed().reverse();
+    const shifted = [...mixed().slice(5), ...mixed().slice(0, 5)];
+    const expected = summary(sortDiagnostics(mixed()));
     assert.deepEqual(summary(sortDiagnostics(reversed)), expected);
     assert.deepEqual(summary(sortDiagnostics(shifted)), expected);
   });
 
-  it("does not change its input", () => {
-    const input = [...mixed];
-    sortDiagnostics(input);
-    assert.deepEqual(input, mixed);
+  it("does not change its input, whose order is not sorted", () => {
+    const input = mixed();
+    const snapshot = structuredClone(input);
+    assert.notDeepEqual(summary(input), expectedOrder, "the fixture must start unsorted");
+    const elements = [...input];
+    const sorted = sortDiagnostics(input);
+    assert.notEqual(sorted, input, "a new array is returned");
+    assert.deepEqual(input, snapshot);
+    input.forEach((element, index) => {
+      assert.equal(element, elements[index], `element ${String(index)} was replaced`);
+    });
+    assert.deepEqual(summary(sorted), expectedOrder);
+  });
+
+  it("sorts a frozen list and its frozen elements without touching them", () => {
+    const input = mixed();
+    for (const element of input) {
+      Object.freeze(element.ids);
+      Object.freeze(element);
+    }
+    Object.freeze(input);
+    assert.deepEqual(summary(sortDiagnostics(input)), expectedOrder);
   });
 
   it("compares ids by code point, element by element, a shorter list first", () => {
@@ -269,8 +335,8 @@ describe("compareDiagnostics and sortDiagnostics (T-AC-2)", () => {
   });
 
   it("keeps diagnostics that are equal under the order in their input order", () => {
-    const first = { ...diag("error", "E_UNKNOWN_ID", ["x"]), message: "first", op: 1 };
-    const second = { ...diag("error", "E_UNKNOWN_ID", ["x"]), message: "second", op: 3 };
+    const first = createDiagnostic("E_UNKNOWN_ID", ["x"], "first", { op: 1 });
+    const second = createDiagnostic("E_UNKNOWN_ID", ["x"], "second", { op: 3 });
     assert.deepEqual(sortDiagnostics([first, second]).map((d) => d.message), ["first", "second"]);
     assert.deepEqual(sortDiagnostics([second, first]).map((d) => d.message), ["second", "first"]);
   });
@@ -370,6 +436,17 @@ describe("quoteFragment (T-AC-4)", () => {
       assert.ok(!/\p{Cs}/u.test(result), "lone surrogate");
       assert.ok(result.endsWith('…"'));
     }
+  });
+
+  it("stops reading once the output bound is passed, so a huge token costs the same as a short one", () => {
+    const huge = "a".repeat(30_000_000);
+    const started = performance.now();
+    const result = quoteFragment(huge);
+    const elapsed = performance.now() - started;
+    assert.equal(result, `"${"a".repeat(79)}…"`);
+    // Reading all 30 million characters takes seconds; stopping at the bound takes well under a millisecond.
+    assert.ok(elapsed < 250, `took ${String(elapsed)} ms`);
+    assert.equal(quoteFragment(`${"\u{1f600}".repeat(1_000_000)}x`).length <= MAX_FRAGMENT_LENGTH + 2, true);
   });
 
   it("neutralises an injected line, so a message stays on one line", () => {
