@@ -18,7 +18,12 @@ import { Worker } from "node:worker_threads";
 import { isRecord, repositoryRoot } from "./helpers.js";
 import { compiledName, discoverSources } from "./support/core-files.js";
 import {
+  FORBIDDEN_MODULES,
   ForbiddenApiError,
+  READ_ONLY_FS,
+  READ_ONLY_FS_PROMISES,
+  RUNTIME_EXCEPTIONS,
+  STUBBED_MODULES,
   assertNoForbiddenCalls,
   installForbiddenApiStubs,
   runUnderStubs,
@@ -111,9 +116,160 @@ test("the stubs cover the process, network, write and code-evaluation APIs of AC
     "Function",
     "AsyncFunction",
     "process.binding",
+    // Cycle 2 of the reviews of PR #61 (CR-4, SR-2): the write classes and the remaining deny-list modules.
+    "fs.FileWriteStream",
+    "fs.WriteStream",
+    "fs.symlinkSync",
+    "fs.linkSync",
+    "fs.truncateSync",
+    "fs.chmodSync",
+    "fs.copyFileSync",
+    "fs.cpSync",
+    "fs/promises.symlink",
+    "inspector.open",
+    "inspector.Session",
+    "wasi.WASI",
   ]) {
     assert.ok(stubbed.has(api), `${api} is not stubbed`);
   }
+});
+
+test("every module of the lint deny-list is stubbed or is a reasoned runtime exception (SR-2)", () => {
+  const stubs = installForbiddenApiStubs();
+  const stubbed = new Set(stubs.stubbed.map((api) => api.split(".")[0]));
+  stubs.uninstall();
+  assert.ok(FORBIDDEN_MODULES.length >= 14, "the deny-list was read from eslint.config.core.js");
+  for (const name of FORBIDDEN_MODULES) {
+    const reason = RUNTIME_EXCEPTIONS.get(name);
+    if (reason === undefined) {
+      assert.ok(STUBBED_MODULES.includes(name), `${name} is neither stubbed nor an exception`);
+      assert.ok(stubbed.has(name), `no export of ${name} was stubbed`);
+    } else {
+      assert.ok(reason.length > 40, `the exception for ${name} needs a reason`);
+      assert.ok(!STUBBED_MODULES.includes(name));
+    }
+  }
+  assert.deepEqual([...RUNTIME_EXCEPTIONS.keys()].sort(), ["module", "worker_threads"]);
+  assert.ok(stubbed.has("worker_threads"), "worker_threads.Worker is stubbed even though the module is an exception");
+});
+
+test("every function of node:fs and node:fs/promises is either read-only or stubbed (CR-4, SR-2)", () => {
+  const stubs = installForbiddenApiStubs();
+  const stubbed = new Set(stubs.stubbed);
+  stubs.uninstall();
+  const classify = (exports: object, prefix: string, readOnly: ReadonlySet<string>): void => {
+    for (const key of Object.keys(exports)) {
+      if (typeof Reflect.get(exports, key) !== "function") {
+        continue;
+      }
+      if (key === "open" || key === "openSync") {
+        assert.ok(stubbed.has(`${prefix}.${key} (write flags)`), `${prefix}.${key} has no flag check`);
+      } else if (readOnly.has(key)) {
+        assert.ok(!stubbed.has(`${prefix}.${key}`), `${prefix}.${key} is listed as read-only but stubbed`);
+      } else {
+        assert.ok(stubbed.has(`${prefix}.${key}`), `${prefix}.${key} is neither read-only nor stubbed`);
+      }
+    }
+  };
+  classify(fs, "fs", READ_ONLY_FS);
+  classify(fsPromises, "fs/promises", READ_ONLY_FS_PROMISES);
+  for (const name of READ_ONLY_FS) {
+    assert.ok(!/^(?:write|append|mkd|rm|unlink|rename|copy|cp|link|symlink|[fl]?chmod|[fl]?chown|f?truncate|[fl]?utimes|f(?:data)?sync)/i.test(name), `${name} looks like a write`);
+  }
+});
+
+test("every installed stub throws ForbiddenApiError and is reported before the original runs", () => {
+  const stubs = installForbiddenApiStubs();
+  const failures: string[] = [];
+  let checked = 0;
+  try {
+    for (const [api, stub] of stubs.stubs) {
+      if (api.endsWith("(write flags)")) {
+        continue; // read-only flags pass through; covered by the open-flags table below
+      }
+      checked += 1;
+      try {
+        Reflect.apply(stub, undefined, []);
+        failures.push(`${api}: no error`);
+      } catch (error: unknown) {
+        if (!(error instanceof ForbiddenApiError) || error.api !== api) {
+          failures.push(`${api}: ${String(error)}`);
+        }
+      }
+    }
+  } finally {
+    stubs.uninstall();
+  }
+  assert.deepEqual(failures, []);
+  assert.equal(stubs.calls.length, checked);
+  assert.ok(checked > 100, `only ${checked} stubs were checked`);
+});
+
+const OPEN_FLAGS: ReadonlyArray<readonly [string, unknown, boolean]> = [
+  ["no flags", undefined, true],
+  ['"r"', "r", true],
+  ['"rs"', "rs", true],
+  ["numeric O_RDONLY", fs.constants.O_RDONLY, true],
+  ['"w"', "w", false],
+  ['"wx"', "wx", false],
+  ['"a"', "a", false],
+  ['"as"', "as", false],
+  ['"r+"', "r+", false],
+  ["numeric O_WRONLY | O_CREAT", fs.constants.O_WRONLY | fs.constants.O_CREAT, false],
+  ["numeric O_RDWR", fs.constants.O_RDWR, false],
+  ["numeric O_RDONLY | O_APPEND", fs.constants.O_RDONLY | fs.constants.O_APPEND, false],
+];
+
+for (const [name, flags, readOnly] of OPEN_FLAGS) {
+  test(`open with ${name} is ${readOnly ? "let through" : "stopped"} by the stubs (CR-4)`, async () => {
+    const target = readOnly ? join(repositoryRoot, "package.json") : join(scratch, `open-${name.replace(/\W+/g, "-")}.txt`);
+    const { calls, error } = await runUnderStubs(() => {
+      fs.closeSync(fs.openSync(target, flags as fs.OpenMode)); // undefined flags stand for the default "r"
+    });
+    if (readOnly) {
+      assert.equal(error, undefined);
+      assert.deepEqual(calls, []);
+    } else {
+      assert.ok(error instanceof ForbiddenApiError);
+      assert.deepEqual(calls.map((call) => call.api), ["fs.openSync (write flags)"]);
+      assert.equal(fs.existsSync(target), false, "nothing was created");
+    }
+  });
+}
+
+test("a failure part-way through installing restores what was already stubbed (CR-6)", () => {
+  const originalSpawn = childProcess.spawn;
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, "XMLHttpRequest");
+  Object.defineProperty(globalThis, "XMLHttpRequest", {
+    configurable: true,
+    get() {
+      throw new Error("injected failure while installing");
+    },
+  });
+  try {
+    assert.throws(() => installForbiddenApiStubs(), /injected failure/);
+  } finally {
+    if (descriptor === undefined) {
+      Reflect.deleteProperty(globalThis, "XMLHttpRequest");
+    } else {
+      Object.defineProperty(globalThis, "XMLHttpRequest", descriptor);
+    }
+  }
+  assert.equal(childProcess.spawn, originalSpawn, "the stub of child_process.spawn was removed again");
+  const stubs = installForbiddenApiStubs();
+  stubs.uninstall();
+});
+
+test("residual 11 (pinned, SR-1): the original class stays reachable through Class.prototype.constructor", async () => {
+  let socket: net.Socket | undefined;
+  const { calls, error } = await runUnderStubs(() => {
+    const original = net.Socket.prototype.constructor as typeof net.Socket;
+    socket = new original();
+  });
+  assert.equal(error, undefined);
+  assert.deepEqual(calls, [], "the guard does not see a class built through its prototype");
+  assert.ok(socket instanceof net.Socket);
+  socket.destroy();
 });
 
 test("reads stay possible under the stubs, and uninstall restores every original", async () => {
