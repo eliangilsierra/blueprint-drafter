@@ -162,6 +162,18 @@ test("fixture: a core file that imports an installed package that is not listed 
   assertOneProblem(review(tree, [entry("good-lib", "1.0.0")]), "src/core/export/png.ts", '"other-lib"', "not on eslint-rules/core-allowlist.js");
 });
 
+test("fixture: an unlisted import in a .tsx, .mts or .cts core file is reported too (CR-2 of PR #61)", () => {
+  for (const file of ["view/badge.tsx", "model/data.mts", "legacy/load.cts"]) {
+    const tree: FixtureTree = { ...cleanTree, core: { ...cleanTree.core, [file]: 'import o from "other-lib";\nexport const y = o;\n' } };
+    assertOneProblem(review(tree, [entry("good-lib", "1.0.0")]), `src/core/${file}`, '"other-lib"', "not on eslint-rules/core-allowlist.js");
+  }
+  // A listed package that only a .tsx file imports is in use, not planned.
+  const tsxOnly: FixtureTree = { ...cleanTree, core: { "view/badge.tsx": 'import lib from "good-lib";\nexport const y = lib;\n' } };
+  const result = reviewCoreDependencies({ root: writeTree(tsxOnly), allowlist: [entry("good-lib", "1.0.0")], forbiddenModules });
+  assert.deepEqual(result.problems, []);
+  assert.deepEqual(result.planned, []);
+});
+
 test("fixture: a listed package that is not a runtime dependency, or a different version, fails", () => {
   const devOnly: FixtureTree = { ...cleanTree, dependencies: { "other-lib": "2.0.0" } };
   const problems = review(devOnly, [entry("good-lib", "1.0.0")]);

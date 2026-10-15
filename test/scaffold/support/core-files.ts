@@ -3,14 +3,33 @@
 
 import { readdirSync } from "node:fs";
 import { extname, join } from "node:path";
+import { pathToFileURL } from "node:url";
 
-/** Every extension tsc compiles from src/core, and the extension of its output (allowJs is off). */
-export const COMPILED_EXTENSIONS: ReadonlyMap<string, string> = new Map([
-  [".ts", ".js"],
-  [".tsx", ".js"],
-  [".mts", ".mjs"],
-  [".cts", ".cjs"],
-]);
+import { repositoryRoot } from "../helpers.js";
+
+/** Output extension of each source extension that tsc can compile. */
+const OUTPUT_EXTENSIONS: Readonly<Record<string, string>> = { ts: ".js", tsx: ".js", mts: ".mjs", cts: ".cjs" };
+
+const coreConfig: unknown = await import(pathToFileURL(join(repositoryRoot, "eslint.config.core.js")).href);
+const listed: unknown =
+  typeof coreConfig === "object" && coreConfig !== null ? Reflect.get(coreConfig, "CORE_SOURCE_EXTENSIONS") : undefined;
+if (!Array.isArray(listed) || listed.length === 0) {
+  throw new Error("eslint.config.core.js does not export CORE_SOURCE_EXTENSIONS");
+}
+
+/**
+ * Every extension tsc compiles from src/core (the single list CORE_SOURCE_EXTENSIONS of eslint.config.core.js),
+ * mapped to the extension of its output (allowJs is off).
+ */
+export const COMPILED_EXTENSIONS: ReadonlyMap<string, string> = new Map(
+  listed.map((extension: unknown) => {
+    const output = typeof extension === "string" ? OUTPUT_EXTENSIONS[extension] : undefined;
+    if (output === undefined) {
+      throw new Error(`no compiled output is known for the core extension ${String(extension)}`);
+    }
+    return [`.${String(extension)}`, output] as const;
+  }),
+);
 
 const DECLARATION = /\.d\.[mc]?ts$/;
 

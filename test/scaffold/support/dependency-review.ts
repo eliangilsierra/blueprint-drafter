@@ -19,6 +19,7 @@ import { join, relative, sep } from "node:path";
 import ts from "typescript";
 
 import { isRecord } from "../helpers.js";
+import { discoverSources } from "./core-files.js";
 
 export interface DependencyReview {
   /** Every problem, one line each; empty when the review passes. */
@@ -52,8 +53,6 @@ interface Entry {
   readonly exceptions: readonly ScanException[];
 }
 
-const SOURCE = /\.(?:[mc]?ts)$/;
-const DECLARATION = /\.d\.[mc]?ts$/;
 const SCANNED = /\.(?:[mc]?js)$/;
 const INSTALL_SCRIPTS = ["preinstall", "install", "postinstall"];
 
@@ -155,7 +154,7 @@ function walk(directory: string, accept: (name: string) => boolean, skipDirector
 function coreImports(root: string): Map<string, string[]> {
   const imports = new Map<string, string[]>();
   const core = join(root, "src", "core");
-  for (const file of walk(core, (name) => SOURCE.test(name) && !DECLARATION.test(name), () => false)) {
+  for (const file of existsSync(core) ? discoverSources(core) : []) {
     const info = ts.preProcessFile(readFileSync(file, "utf8"), true, true);
     for (const imported of info.importedFiles) {
       const name = packageName(imported.fileName);
