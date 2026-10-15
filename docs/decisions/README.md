@@ -15,6 +15,7 @@ is shaped the way it is. The architecture that applies them is in [docs/architec
 | [ADR-0005](ADR-0005-apache-2-0-and-dependency-licence-policy.md) | License the project under Apache-2.0 and admit runtime dependencies by licence policy | Accepted | 2026-10-13 |
 | [ADR-0006](ADR-0006-name-binary-extension-and-header.md) | Name the CLI binary, the diagram file extension and the format header keyword | Accepted | 2026-10-13 |
 | [ADR-0007](ADR-0007-one-npm-package-compiled-esm-node-22.md) | Distribute one npm package with one binary, compiled to ESM for Node.js 22 or later | Accepted | 2026-10-13 |
+| [ADR-0008](ADR-0008-complete-the-text-format-v1-contract.md) | Complete the text format v1 contract with the points left open by the first review | Proposed | 2026-10-15 |
 
 Keep this index updated in the same Pull Request that adds or changes an ADR.
 
