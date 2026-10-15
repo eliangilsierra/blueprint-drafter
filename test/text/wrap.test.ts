@@ -269,7 +269,7 @@ describe("wrap with the bundled font (AC-8, AC-9)", () => {
     }
   });
 
-  it("ends the last line with an ellipsis and flags truncation when the label cannot fit (AC-9)", () => {
+  it("ends the last line with an ellipsis and flags truncation when the label needs too many lines (AC-9)", () => {
     const label = longLabels.find((candidate) => candidate.startsWith("Lets customers manage subscriptions")) ?? "";
     assert.ok(label.length > 50);
     const full = real.wrap(label, 90, 12, "regular", 20);
